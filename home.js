@@ -48,7 +48,7 @@ function wireHomeButtons() {
     activate(endless, () => {
         showInitialSpinner();
         // Mark that we intentionally entered the game from the home screen.
-        sessionStorage.setItem('snippitguessr.startMode', 'endless');
+        sessionStorage.setItem('snippit.startMode', 'endless');
         // Navigate to the game page; it will run its own loading sequence.
         setTimeout(() => {
             window.location.href = 'game.html';
@@ -56,12 +56,148 @@ function wireHomeButtons() {
     });
 
     activate(points, () => {
-        window.alert('Points mode is coming soon.');
+        showInitialSpinner();
+        // Mark that we intentionally entered the points mode from the home screen.
+        sessionStorage.setItem('snippit.startMode', 'points');
+        setTimeout(() => {
+            window.location.href = 'points.html';
+        }, 80);
     });
+}
+
+function wireHomeTitleBarrelRoll() {
+    const title = document.querySelector('.home-title');
+    const inner = document.querySelector('.home-title__inner');
+    if (!title || !inner) return;
+
+    const rollOnce = () => {
+        if (inner.classList.contains('is-rolling')) return;
+        inner.classList.add('is-rolling');
+    };
+
+    inner.addEventListener('animationend', (e) => {
+        if (e.animationName === 'homeTitleBarrelRoll') {
+            inner.classList.remove('is-rolling');
+        }
+    });
+
+    title.addEventListener('click', rollOnce);
+    title.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            rollOnce();
+        }
+    });
+}
+
+function wireHomeCreditConfetti() {
+    const pill = document.getElementById('homeCredit');
+    const canvas = document.getElementById('homeConfettiCanvas');
+    if (!pill || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    // Keep one animation loop; clicks just add more particles.
+    const colors = ['#4CAF50', '#FFD700', '#ffffff'];
+    const particles = [];
+    let animationRunning = false;
+    const DURATION_MS = 1100;
+
+    const addBurst = () => {
+        resize();
+
+        const rect = pill.getBoundingClientRect();
+        const originX = rect.left + rect.width / 2;
+        const originY = rect.top;
+        const bornAt = performance.now();
+
+        const count = 36;
+        for (let i = 0; i < count; i++) {
+            const angle = (-Math.PI / 2) + (-0.9 + Math.random() * 1.8);
+            const speed = 3.5 + Math.random() * 4.5;
+            particles.push({
+                x: originX,
+                y: originY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 4 + Math.random() * 5,
+                rotation: Math.random() * Math.PI,
+                rotationSpeed: (-0.25 + Math.random() * 0.5),
+                color: colors[Math.floor(Math.random() * colors.length)],
+                bornAt
+            });
+        }
+
+        if (!animationRunning) {
+            animationRunning = true;
+            requestAnimationFrame(frame);
+        }
+    };
+
+    const frame = (now) => {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+        // Update + draw all particles, and keep only those still alive.
+        let writeIndex = 0;
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            const age = now - p.bornAt;
+            if (age >= DURATION_MS) continue;
+
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rotation += p.rotationSpeed;
+            p.vy += 0.12; // gravity
+
+            const alpha = Math.max(0, 1 - age / DURATION_MS);
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65);
+            ctx.restore();
+
+            particles[writeIndex++] = p;
+        }
+        particles.length = writeIndex;
+
+        if (particles.length > 0) {
+            requestAnimationFrame(frame);
+        } else {
+            animationRunning = false;
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        }
+    };
+
+    const activate = () => addBurst();
+
+    pill.addEventListener('click', activate);
+    pill.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            activate();
+        }
+    });
+
+    window.addEventListener('resize', resize);
 }
 
 window.addEventListener('load', () => {
     wireHomeButtons();
+    wireHomeTitleBarrelRoll();
+    wireHomeCreditConfetti();
 
     // Always show the loading sequence before presenting the home screen.
     showInitialSpinner();

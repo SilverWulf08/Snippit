@@ -36,7 +36,7 @@ body {
     position: absolute;
     top: 44px;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(0) scale(1);
     font-size: 64px;
     font-weight: 700;
     letter-spacing: -0.6px;
@@ -44,7 +44,50 @@ body {
     text-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
     opacity: 1;
     z-index: 3;
-    pointer-events: none;
+    pointer-events: auto;
+    user-select: none;
+    cursor: pointer;
+    transition: transform 180ms ease, filter 180ms ease;
+}
+
+.home-title:hover {
+    transform: translateX(-50%) translateY(-2px) scale(1.06);
+    filter: brightness(1.06);
+}
+
+.home-title:active {
+    transform: translateX(-50%) translateY(0) scale(1.03);
+}
+
+.home-title:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline-offset: 6px;
+    border-radius: 10px;
+}
+
+.home-title__inner {
+    display: inline-block;
+    transform-origin: 50% 50%;
+}
+
+.home-title__inner.is-rolling {
+    animation: homeTitleBarrelRoll 900ms linear both;
+}
+
+@keyframes homeTitleBarrelRoll {
+    /* 1 full rotation with slow -> fast -> slow feel (via angle/time distribution) */
+    0% {
+        transform: rotate(0deg);
+    }
+    20% {
+        transform: rotate(30deg);
+    }
+    70% {
+        transform: rotate(330deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .home-modes {
@@ -54,11 +97,48 @@ body {
     z-index: 1;
 }
 
+.home-credit-pill {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 4;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(36, 36, 36, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.home-credit-pill:hover {
+    transform: translateX(-50%) scale(1.06);
+    filter: brightness(1.06);
+}
+
+.home-credit-pill:active {
+    transform: translateX(-50%) scale(1.02);
+}
+
+.home-credit-pill:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline-offset: 3px;
+}
+
 .home-mode {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     font-size: 34px;
     font-weight: 500;
     user-select: none;
@@ -72,6 +152,21 @@ body {
 .home-mode__label {
     position: relative;
     z-index: 1;
+}
+
+.home-mode__description {
+    position: relative;
+    z-index: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    max-width: min(520px, calc(100% - 80px));
+    text-align: center;
+    line-height: 1.35;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 220ms ease, transform 220ms ease;
+    pointer-events: none;
 }
 
 .home-mode::before {
@@ -108,6 +203,12 @@ body {
     z-index: 2;
     filter: brightness(1.06);
     box-shadow: -18px 0 32px rgba(0, 0, 0, 0.55);
+}
+
+.home-mode:hover .home-mode__description,
+.home-mode:focus-visible .home-mode__description {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .home-mode--blue:hover::before,
@@ -198,6 +299,26 @@ body {
     font-weight: 600;
     pointer-events: none;
     letter-spacing: 0.2px;
+}
+
+/* Points mode: round timer badge (top-center of Snippit) */
+.points-timer {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    padding: 8px 12px;
+    border-radius: 999px;
+    z-index: 1000;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    pointer-events: none;
+    min-width: 72px;
+    text-align: center;
 }
 
 #map {
@@ -312,6 +433,19 @@ button:disabled {
     color: #fff;
 }
 
+.points-progress {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+body:not([data-mode="points"]) .points-progress {
+    display: none;
+}
+
 #hint {
     background: rgba(30, 30, 30, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -365,6 +499,87 @@ button:disabled {
 @keyframes compass-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* Points mode: end-of-game summary */
+.points-summary-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+}
+
+.points-summary-card {
+    position: relative;
+    width: min(520px, calc(100% - 32px));
+    background: rgba(30, 30, 30, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 18px 16px;
+}
+
+.points-summary-title {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.points-summary-body {
+    display: grid;
+    gap: 8px;
+    text-align: center;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+
+.points-summary-score {
+    font-size: 34px;
+    font-weight: 800;
+    color: #fff;
+}
+
+.points-summary-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.points-summary-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.retry-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    animation: retry-spin 1.2s linear infinite;
+}
+
+@keyframes retry-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.confetti-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* Home-only: confetti must appear above the full-screen mode panels */
+#homeConfettiCanvas {
+    z-index: 5;
 }
 
 /* Leaflet control polish */

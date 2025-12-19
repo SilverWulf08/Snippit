@@ -15,6 +15,13 @@ const INITIAL_LOAD_DELAY_MS = 900;
 
 let gameInitialized = false;
 
+const GAME_MODE = (document.body && document.body.dataset && document.body.dataset.mode === 'points') ? 'points' : 'endless';
+const POINTS_ROUNDS_TOTAL = 10;
+const POINTS_GOAL_TOTAL = 1000;
+const POINTS_ROUND_TIME_LIMIT_MS = 2 * 60 * 1000;
+
+let pointsState = null;
+
 // Splitter sizing (desktop/tablet)
 const MIN_PANORAMA_WIDTH_PX = 280;
 const MIN_MAP_WIDTH_PX = 280;
@@ -102,6 +109,264 @@ function initGameIfNeeded() {
     initSplitter();
 
     gameInitialized = true;
+}
+
+function formatClockMs(ms) {
+    const clamped = Math.max(0, ms);
+    const totalSeconds = Math.floor(clamped / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function isPointsMode() {
+    return GAME_MODE === 'points';
+}
+
+function ensurePointsState() {
+    if (!isPointsMode()) return null;
+    if (pointsState) return pointsState;
+    pointsState = {
+        round: 0,
+        totalPoints: 0,
+        totalTimeMs: 0,
+        roundStartMs: 0,
+        roundEnded: false,
+        timerIntervalId: null
+    };
+    return pointsState;
+}
+
+function resetPointsState() {
+    if (!isPointsMode()) return;
+    pointsState = {
+        round: 0,
+        totalPoints: 0,
+        totalTimeMs: 0,
+        roundStartMs: 0,
+        roundEnded: false,
+        timerIntervalId: null
+    };
+}
+
+function getPointsTimerEl() {
+    return document.getElementById('pointsTimer');
+}
+
+function setPointsTimerText(text) {
+    const el = getPointsTimerEl();
+    if (el) el.textContent = text;
+}
+
+function stopPointsRoundTimer() {
+    if (!pointsState) return;
+    if (pointsState.timerIntervalId) {
+        clearInterval(pointsState.timerIntervalId);
+        pointsState.timerIntervalId = null;
+    }
+}
+
+function tickPointsRoundTimer() {
+    if (!pointsState) return;
+    if (pointsState.roundEnded) return;
+
+    const elapsed = Date.now() - pointsState.roundStartMs;
+    const remaining = POINTS_ROUND_TIME_LIMIT_MS - elapsed;
+
+    setPointsTimerText(formatClockMs(remaining));
+
+    if (remaining <= 0) {
+        onPointsRoundTimeout();
+    }
+}
+
+function startPointsRoundTimer() {
+    if (!pointsState) return;
+    stopPointsRoundTimer();
+    pointsState.roundStartMs = Date.now();
+    setPointsTimerText(formatClockMs(POINTS_ROUND_TIME_LIMIT_MS));
+
+    // Tick relatively frequently so it feels responsive.
+    pointsState.timerIntervalId = setInterval(tickPointsRoundTimer, 200);
+}
+
+function getBasePointsForDistanceKm(distanceKm) {
+    if (distanceKm < 10) return 200;
+    if (distanceKm < 50) return 160;
+    if (distanceKm < 200) return 120;
+    if (distanceKm < 500) return 90;
+    if (distanceKm < 1000) return 60;
+    return 30;
+}
+
+function getSpeedMultiplierForElapsedMs(elapsedMs) {
+    if (elapsedMs < 30 * 1000) return 2;
+    if (elapsedMs < 60 * 1000) return 1.5;
+    return 1;
+}
+
+function showPointsSummaryOverlay() {
+    const overlay = document.getElementById('pointsSummaryOverlay');
+    if (!overlay) return;
+
+    const scoreEl = document.getElementById('pointsSummaryScore');
+    const goalEl = document.getElementById('pointsSummaryGoal');
+    const timeEl = document.getElementById('pointsSummaryTime');
+
+    const totalPoints = pointsState ? pointsState.totalPoints : 0;
+    const totalTimeMs = pointsState ? pointsState.totalTimeMs : 0;
+    const success = totalPoints >= POINTS_GOAL_TOTAL;
+
+    if (scoreEl) scoreEl.textContent = `${totalPoints} pts`;
+    if (goalEl) goalEl.textContent = success ? `Goal reached (≥ ${POINTS_GOAL_TOTAL})` : `Goal not reached (${POINTS_GOAL_TOTAL} needed)`;
+    if (timeEl) timeEl.textContent = `Total time: ${formatClockMs(totalTimeMs)}`;
+
+    overlay.style.display = 'flex';
+    overlay.setAttribute('aria-hidden', 'false');
+
+    if (success) {
+        launchConfetti();
+    }
+}
+
+function hidePointsSummaryOverlay() {
+    const overlay = document.getElementById('pointsSummaryOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
+}
+
+function wirePointsSummaryActions() {
+    if (!isPointsMode()) return;
+
+    const retryBtn = document.getElementById('pointsRetryBtn');
+    const homeBtn = document.getElementById('pointsHomeBtn');
+
+    if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+            hidePointsSummaryOverlay();
+            resetPointsState();
+            showInitialSpinner();
+            setTimeout(() => {
+                initGameIfNeeded();
+                newRound();
+            }, INITIAL_LOAD_DELAY_MS);
+        });
+    }
+
+    if (homeBtn) {
+        homeBtn.addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+    }
+}
+
+function endPointsGame() {
+    if (!pointsState) return;
+    stopPointsRoundTimer();
+    pointsState.roundEnded = true;
+
+    // Hide in-game controls so the summary is the focus.
+    const guessBtn = document.getElementById('guessBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (guessBtn) guessBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
+
+    showPointsSummaryOverlay();
+}
+
+function onPointsRoundTimeout() {
+    if (!pointsState) return;
+    if (pointsState.roundEnded) return;
+
+    pointsState.roundEnded = true;
+    stopPointsRoundTimer();
+    pointsState.totalTimeMs += POINTS_ROUND_TIME_LIMIT_MS;
+    setPointsTimerText('0:00');
+    guessLocked = true;
+
+    // If this was the last round, finish immediately.
+    if (pointsState.round >= POINTS_ROUNDS_TOTAL) {
+        endPointsGame();
+        return;
+    }
+
+    // Auto-advance to the next round.
+    showRoundSpinner();
+    nextRoundTimer = setTimeout(() => {
+        nextRoundTimer = null;
+        newRound();
+    }, 500);
+}
+
+function launchConfetti() {
+    const canvas = document.getElementById('confettiCanvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(window.innerWidth * dpr);
+        canvas.height = Math.floor(window.innerHeight * dpr);
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    resize();
+
+    const colors = ['#4CAF50', '#FFD700', '#ffffff'];
+    const pieces = Array.from({ length: 140 }, () => {
+        const x = Math.random() * window.innerWidth;
+        const y = -20 - Math.random() * 200;
+        const size = 6 + Math.random() * 8;
+        const speedY = 2 + Math.random() * 5;
+        const speedX = -2 + Math.random() * 4;
+        const rotation = Math.random() * Math.PI;
+        const rotationSpeed = (-0.15 + Math.random() * 0.3);
+        return {
+            x,
+            y,
+            size,
+            speedX,
+            speedY,
+            rotation,
+            rotationSpeed,
+            color: colors[Math.floor(Math.random() * colors.length)]
+        };
+    });
+
+    const start = performance.now();
+    const duration = 2600;
+
+    const frame = (now) => {
+        const t = now - start;
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+        for (const p of pieces) {
+            p.x += p.speedX;
+            p.y += p.speedY;
+            p.rotation += p.rotationSpeed;
+            p.speedY += 0.03; // gravity
+
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+            ctx.restore();
+        }
+
+        if (t < duration) {
+            requestAnimationFrame(frame);
+        } else {
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        }
+    };
+
+    requestAnimationFrame(frame);
 }
 
 function scheduleInvalidateSizes() {
@@ -334,6 +599,26 @@ function newRound() {
     if (result) result.style.display = 'none';
     if (hint) hint.style.display = 'block';
 
+    if (isPointsMode()) {
+        ensurePointsState();
+        pointsState.roundEnded = false;
+
+        // If the player already reached the goal, finish immediately.
+        if (pointsState.totalPoints >= POINTS_GOAL_TOTAL) {
+            endPointsGame();
+            return;
+        }
+
+        // Advance round and check for end.
+        pointsState.round += 1;
+        if (pointsState.round > POINTS_ROUNDS_TOTAL) {
+            endPointsGame();
+            return;
+        }
+
+        startPointsRoundTimer();
+    }
+
     // Get random location
     const location = pickNextLocation();
     actualLocation = { lat: location.lat, lng: location.lng };
@@ -363,6 +648,13 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 function makeGuess() {
     if (!guessLocation) return;
+
+    if (isPointsMode()) {
+        ensurePointsState();
+        if (pointsState.roundEnded) return;
+        pointsState.roundEnded = true;
+        stopPointsRoundTimer();
+    }
 
     guessLocked = true;
 
@@ -437,6 +729,47 @@ function makeGuess() {
         message = '🌍 Keep practicing!';
     }
 
+    if (isPointsMode()) {
+        const elapsedMs = Math.max(0, Date.now() - pointsState.roundStartMs);
+        pointsState.totalTimeMs += elapsedMs;
+
+        const basePoints = getBasePointsForDistanceKm(distance);
+        const multiplier = getSpeedMultiplierForElapsedMs(elapsedMs);
+        const awarded = Math.round(basePoints * multiplier);
+        pointsState.totalPoints += awarded;
+
+        const progressEl = document.getElementById('pointsProgress');
+        if (progressEl) progressEl.textContent = `${pointsState.totalPoints}/${POINTS_GOAL_TOTAL}`;
+
+        const multiplierText = multiplier === 1 ? '' : ` (x${multiplier})`;
+        message = `${message} +${awarded} points${multiplierText}`;
+
+        // If the goal is reached, end immediately (timer already stopped above).
+        if (pointsState.totalPoints >= POINTS_GOAL_TOTAL) {
+            const guessBtn = document.getElementById('guessBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            if (guessBtn) guessBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
+
+            setTimeout(() => {
+                endPointsGame();
+            }, 250);
+        }
+
+        // If this was the last round, end the game after showing the result.
+        if (pointsState.round >= POINTS_ROUNDS_TOTAL) {
+            // Hide the next-round UI; the summary is shown on top.
+            const guessBtn = document.getElementById('guessBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            if (guessBtn) guessBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
+
+            setTimeout(() => {
+                endPointsGame();
+            }, 250);
+        }
+    }
+
     const resultText = document.getElementById('resultText');
     const actualName = document.getElementById('actualLocationName');
     const guessedNameEl = document.getElementById('guessedLocationName');
@@ -450,7 +783,8 @@ function makeGuess() {
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
     if (guessBtn) guessBtn.style.display = 'none';
-    if (nextBtn) nextBtn.style.display = 'block';
+    if (nextBtn && !isPointsMode()) nextBtn.style.display = 'block';
+    if (nextBtn && isPointsMode() && pointsState.round < POINTS_ROUNDS_TOTAL) nextBtn.style.display = 'block';
 }
 
 // Event listeners
@@ -480,6 +814,10 @@ window.addEventListener('load', () => {
     showInitialSpinner();
     setTimeout(() => {
         initGameIfNeeded();
+        if (isPointsMode()) {
+            resetPointsState();
+            wirePointsSummaryActions();
+        }
         newRound();
     }, INITIAL_LOAD_DELAY_MS);
 });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snippit</title>
+    <title>Snippit — Points Mode</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,14 +11,14 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-mode="points">
     <script>
-        // Refreshing or directly opening the game page should return to the home screen.
+        // Refreshing or directly opening the points page should return to the home screen.
         // Only allow entry if navigated from the home screen (set by home.js).
         (() => {
             const key = 'snippit.startMode';
             const mode = sessionStorage.getItem(key);
-            if (mode !== 'endless') {
+            if (mode !== 'points') {
                 window.location.replace('index.html');
                 return;
             }
@@ -39,6 +39,7 @@
     <div id="container">
         <div id="panorama">
             <div id="snippitLabel">Snippit</div>
+            <div id="pointsTimer" class="points-timer" aria-live="polite">2:00</div>
             <div id="miniMap"></div>
         </div>
         <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>
@@ -49,6 +50,7 @@
                 <h2>Result</h2>
                 <div class="distance" id="distance"></div>
                 <p id="resultText"></p>
+                <div id="pointsProgress" class="points-progress">0/1000</div>
                 <p class="location-info" id="actualLocationName"></p>
                 <p class="location-info" id="guessedLocationName"></p>
             </div>
@@ -58,6 +60,30 @@
     <div id="controls">
         <button id="guessBtn" disabled>Guess!</button>
         <button id="nextBtn" style="display: none;">Next Round</button>
+    </div>
+
+    <!-- End-of-game summary overlay (material-ish card) -->
+    <div id="pointsSummaryOverlay" class="points-summary-overlay" style="display:none;" aria-hidden="true">
+        <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
+        <div class="points-summary-card" role="dialog" aria-modal="true" aria-labelledby="pointsSummaryTitle">
+            <div id="pointsSummaryTitle" class="points-summary-title">Points Mode</div>
+            <div class="points-summary-body">
+                <div id="pointsSummaryScore" class="points-summary-score"></div>
+                <div id="pointsSummaryGoal" class="points-summary-goal"></div>
+                <div id="pointsSummaryTime" class="points-summary-time"></div>
+            </div>
+            <div class="points-summary-actions">
+                <button id="pointsRetryBtn" type="button">
+                    <span class="retry-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                            <path fill="currentColor" d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5a5 5 0 0 1-8.66 3.54l-1.42 1.42A7 7 0 0 0 19 13c0-3.87-3.13-7-7-7z"/>
+                        </svg>
+                    </span>
+                    Retry
+                </button>
+                <button id="pointsHomeBtn" type="button">Home</button>
+            </div>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
