@@ -19,10 +19,121 @@
 }
 
 body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: radial-gradient(1200px 800px at 20% 10%, #1a1a1a 0%, var(--bg) 55%, #0f0f0f 100%);
     color: var(--text);
     overflow: hidden;
+}
+
+/* Home screen */
+.home-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+}
+
+.home-title {
+    position: absolute;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    text-align: center;
+    text-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    opacity: 1;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.home-modes {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    z-index: 1;
+}
+
+.home-mode {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    font-weight: 500;
+    user-select: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.home-mode__label {
+    position: relative;
+    z-index: 1;
+}
+
+.home-mode::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    /* Neutral dark overlay to make panels darker without introducing new colors */
+    background: rgba(0, 0, 0, 0.68);
+    transition: background 180ms ease;
+}
+
+.home-mode--blue {
+    /* Endless mode: gray */
+    background: var(--surface-2);
+}
+
+.home-mode--red {
+    /* Points mode: same green as the Guess button */
+    background: #4CAF50;
+}
+
+.home-mode--blue:hover {
+    transform: scaleX(1.05);
+    transform-origin: left center;
+    z-index: 2;
+    filter: brightness(1.06);
+    box-shadow: 18px 0 32px rgba(0, 0, 0, 0.55);
+}
+
+.home-mode--red:hover {
+    transform: scaleX(1.05);
+    transform-origin: right center;
+    z-index: 2;
+    filter: brightness(1.06);
+    box-shadow: -18px 0 32px rgba(0, 0, 0, 0.55);
+}
+
+.home-mode--blue:hover::before,
+.home-mode--red:hover::before {
+    background: rgba(0, 0, 0, 0.58);
+}
+
+.home-mode:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline-offset: -6px;
+}
+
+.game-screen {
+    position: fixed;
+    inset: 0;
+}
+
+@media (max-width: 768px) {
+    .home-title {
+        top: 30px;
+        font-size: 48px;
+    }
+
+    .home-mode {
+        font-size: 26px;
+    }
 }
 
 #container {

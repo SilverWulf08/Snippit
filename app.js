@@ -11,6 +11,10 @@ let guessLocked = false;
 let nextRoundTimer = null;
 let initialSpinnerDismissed = false;
 
+const INITIAL_LOAD_DELAY_MS = 900;
+
+let gameInitialized = false;
+
 // Splitter sizing (desktop/tablet)
 const MIN_PANORAMA_WIDTH_PX = 280;
 const MIN_MAP_WIDTH_PX = 280;
@@ -59,9 +63,14 @@ function pickNextLocation() {
     return locations[index];
 }
 
-function initMap() {
-    // Show initial spinner during page load/refresh.
-    showInitialSpinner();
+function initGameIfNeeded() {
+    if (gameInitialized) return;
+
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        // This script is intended for the game page only.
+        return;
+    }
 
     // Initialize main Leaflet map with continuous world wrapping
     map = L.map('map', {
@@ -92,11 +101,7 @@ function initMap() {
 
     initSplitter();
 
-    // Start first round with the same small delay as Next Round.
-    nextRoundTimer = setTimeout(() => {
-        nextRoundTimer = null;
-        newRound();
-    }, 900);
+    gameInitialized = true;
 }
 
 function scheduleInvalidateSizes() {
@@ -206,6 +211,9 @@ function initSplitter() {
 function showInitialSpinner() {
     const el = document.getElementById('initialSpinner');
     if (!el) return;
+
+    // Allow re-using the initial spinner for mode transitions.
+    initialSpinnerDismissed = false;
     el.classList.remove('is-fading-out');
     el.style.display = 'flex';
 }
@@ -293,7 +301,8 @@ function placeGuessMarker(latlng) {
     }).addTo(map);
 
     guessLocation = latlng;
-    document.getElementById('guessBtn').disabled = false;
+    const guessBtn = document.getElementById('guessBtn');
+    if (guessBtn) guessBtn.disabled = false;
 }
 
 function newRound() {
@@ -309,12 +318,21 @@ function newRound() {
 
     guessLocation = null;
     guessLocked = false;
-    document.getElementById('guessBtn').disabled = true;
-    document.getElementById('nextBtn').disabled = false;
-    document.getElementById('result').style.display = 'none';
-    document.getElementById('nextBtn').style.display = 'none';
-    document.getElementById('guessBtn').style.display = 'block';
-    document.getElementById('hint').style.display = 'block';
+    const guessBtn = document.getElementById('guessBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const result = document.getElementById('result');
+    const hint = document.getElementById('hint');
+
+    if (guessBtn) {
+        guessBtn.disabled = true;
+        guessBtn.style.display = 'block';
+    }
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.style.display = 'none';
+    }
+    if (result) result.style.display = 'none';
+    if (hint) hint.style.display = 'block';
 
     // Get random location
     const location = pickNextLocation();
@@ -348,7 +366,8 @@ function makeGuess() {
 
     guessLocked = true;
 
-    document.getElementById('hint').style.display = 'none';
+    const hint = document.getElementById('hint');
+    if (hint) hint.style.display = 'none';
 
     const distance = calculateDistance(
         guessLocation.lat,
@@ -400,7 +419,8 @@ function makeGuess() {
     }
 
     // Display result
-    document.getElementById('distance').textContent = `${distance.toFixed(2)} km`;
+    const distanceEl = document.getElementById('distance');
+    if (distanceEl) distanceEl.textContent = `${distance.toFixed(2)} km`;
 
     let message = '';
     if (distance < 10) {
@@ -417,20 +437,28 @@ function makeGuess() {
         message = '🌍 Keep practicing!';
     }
 
-    document.getElementById('resultText').textContent = message;
-    document.getElementById('actualLocationName').innerHTML = `<strong>Actual location:</strong> ${currentLocationName}`;
-    document.getElementById('guessedLocationName').innerHTML = `<strong>You guessed near:</strong> ${guessedName}`;
-    document.getElementById('result').style.display = 'block';
+    const resultText = document.getElementById('resultText');
+    const actualName = document.getElementById('actualLocationName');
+    const guessedNameEl = document.getElementById('guessedLocationName');
+    const result = document.getElementById('result');
+    if (resultText) resultText.textContent = message;
+    if (actualName) actualName.innerHTML = `<strong>Actual location:</strong> ${currentLocationName}`;
+    if (guessedNameEl) guessedNameEl.innerHTML = `<strong>You guessed near:</strong> ${guessedName}`;
+    if (result) result.style.display = 'block';
 
     // Show next button
-    document.getElementById('guessBtn').style.display = 'none';
-    document.getElementById('nextBtn').style.display = 'block';
+    const guessBtn = document.getElementById('guessBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (guessBtn) guessBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'block';
 }
 
 // Event listeners
-document.getElementById('guessBtn').addEventListener('click', makeGuess);
+const guessBtn = document.getElementById('guessBtn');
+if (guessBtn) guessBtn.addEventListener('click', makeGuess);
 
-document.getElementById('nextBtn').addEventListener('click', () => {
+const nextBtn = document.getElementById('nextBtn');
+if (nextBtn) nextBtn.addEventListener('click', () => {
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
 
@@ -447,4 +475,11 @@ document.getElementById('nextBtn').addEventListener('click', () => {
 });
 
 // Initialize on load
-window.addEventListener('load', initMap);
+window.addEventListener('load', () => {
+    // Game page only: show initial loading, then start.
+    showInitialSpinner();
+    setTimeout(() => {
+        initGameIfNeeded();
+        newRound();
+    }, INITIAL_LOAD_DELAY_MS);
+});

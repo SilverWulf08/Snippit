@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snippit</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <script>
+        // Refreshing or directly opening the game page should return to the home screen.
+        // Only allow entry if navigated from the home screen (set by home.js).
+        (() => {
+            const key = 'snippitguessr.startMode';
+            const mode = sessionStorage.getItem(key);
+            if (mode !== 'endless') {
+                window.location.replace('index.html');
+                return;
+            }
+            sessionStorage.removeItem(key);
+        })();
+    </script>
+
+    <!-- Initial page-load spinner (solid black background + white compass, fades out) -->
+    <div id="initialSpinner" class="spinner-overlay spinner-overlay--initial" style="display: flex;" aria-hidden="true">
+        <img class="compass-spinner compass-spinner--white" src="compass.png" alt="Loading" />
+    </div>
+
+    <!-- Next-round spinner (blurred overlay + black compass) -->
+    <div id="roundSpinner" class="spinner-overlay" style="display: none;" aria-hidden="true">
+        <img class="compass-spinner" src="black compass.png" alt="Loading" />
+    </div>
+
+    <div id="container">
+        <div id="panorama">
+            <div id="snippitLabel">Snippit</div>
+            <div id="miniMap"></div>
+        </div>
+        <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>
+        <div id="map">
+            <div id="hint" class="map-overlay">Click on the map to place your guess!</div>
+
+            <div id="result" class="map-overlay" style="display: none;">
+                <h2>Result</h2>
+                <div class="distance" id="distance"></div>
+                <p id="resultText"></p>
+                <p class="location-info" id="actualLocationName"></p>
+                <p class="location-info" id="guessedLocationName"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="guessBtn" disabled>Guess!</button>
+        <button id="nextBtn" style="display: none;">Next Round</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="locations.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
