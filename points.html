@@ -44,16 +44,29 @@
         </div>
         <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>
         <div id="map">
-            <div id="hint" class="map-overlay">Click on the map to place your guess!</div>
+            <div id="hintToast" class="map-toast" role="status" aria-live="polite" style="display:none;">
+                <div class="map-toast__text">click on this map to place a guess!</div>
+                <button id="hintToastClose" class="map-toast__close" type="button" aria-label="Dismiss hint">×</button>
+            </div>
 
             <div id="result" class="map-overlay" style="display: none;">
-                <h2>Result</h2>
+                <div class="result-content">
+                    <h2>Result</h2>
                 <div class="distance" id="distance"></div>
                 <p id="resultText"></p>
                 <div id="pointsProgress" class="points-progress">0/1000</div>
                 <p class="location-info" id="actualLocationName"></p>
                 <p class="location-info" id="guessedLocationName"></p>
+                </div>
+
+                <div class="result-chevron-indicator" aria-hidden="true">
+                    <img class="result-chevron-indicator__img" src="chevron.png" alt="" aria-hidden="true" />
+                </div>
             </div>
+
+            <button id="resultShowToggle" class="result-show-toggle" type="button" aria-label="Show result">
+                <img class="result-show-toggle__img" src="chevron.png" alt="" aria-hidden="true" />
+            </button>
         </div>
     </div>
 

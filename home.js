@@ -1,6 +1,33 @@
 const INITIAL_LOAD_DELAY_MS = 900;
 let initialSpinnerDismissed = false;
 
+const MAP_HINT_DISMISSED_KEY = 'snippit.mapHintDismissed';
+
+function getNavigationType() {
+    try {
+        const entry = performance.getEntriesByType('navigation')[0];
+        if (entry && entry.type) return entry.type;
+
+        if (performance && performance.navigation && typeof performance.navigation.type === 'number') {
+            if (performance.navigation.type === 1) return 'reload';
+            if (performance.navigation.type === 2) return 'back_forward';
+            if (performance.navigation.type === 0) return 'navigate';
+        }
+
+        return 'unknown';
+    } catch {
+        return 'unknown';
+    }
+}
+
+function clearMapHintOnReload() {
+    if (getNavigationType() === 'reload') {
+        sessionStorage.removeItem(MAP_HINT_DISMISSED_KEY);
+    }
+}
+
+clearMapHintOnReload();
+
 function showInitialSpinner() {
     const el = document.getElementById('initialSpinner');
     if (!el) return;
@@ -30,6 +57,94 @@ function showHomeScreen() {
     if (home) home.style.display = 'block';
 }
 
+let pendingMode = null;
+
+function setModeIntroVisible(visible) {
+    const intro = document.getElementById('modeIntro');
+    if (!intro) return;
+    intro.classList.toggle('is-visible', visible);
+    intro.setAttribute('aria-hidden', visible ? 'false' : 'true');
+}
+
+function showModeIntro(mode) {
+    pendingMode = mode;
+
+    const intro = document.getElementById('modeIntro');
+    const title = document.getElementById('modeIntroTitle');
+    const desc = document.getElementById('modeIntroDescription');
+    const diff = document.getElementById('modeIntroPointsDifficulty');
+    if (!intro || !title || !desc || !diff) return;
+
+    intro.dataset.mode = mode;
+
+    if (mode === 'endless') {
+        title.textContent = 'Endless mode';
+        desc.textContent = 'Play as many rounds as you like. After each guess you\'ll see how far off you were, so you can keep improving your world knowledge.';
+        diff.style.display = 'none';
+    } else {
+        title.textContent = 'Points mode';
+        desc.textContent =
+            'Play 10 rounds and try to reach 1000 points.\n' +
+            'Points are based on distance (closer = more points) and a speed bonus.\n' +
+            'If time runs out, the round ends with 0 points and auto-advances.\n\n' +
+            'Normal: 2:00 per round. Speed bonus: 2x (under 30s), 1.5x (under 60s).\n' +
+            'Challenging: 1:00 per round. Reduced distance points. Speed bonus: 1.5x (under 30s).';
+        diff.style.display = 'block';
+    }
+
+    setModeIntroVisible(true);
+}
+
+function hideModeIntro() {
+    pendingMode = null;
+    setModeIntroVisible(false);
+}
+
+function getSelectedPointsDifficulty() {
+    const selected = document.querySelector('input[name="pointsDifficulty"]:checked');
+    return selected ? selected.value : 'normal';
+}
+
+function startSelectedMode() {
+    if (!pendingMode) return;
+
+    showInitialSpinner();
+
+    if (pendingMode === 'endless') {
+        sessionStorage.setItem('snippit.startMode', 'endless');
+        setTimeout(() => {
+            window.location.href = 'game.html';
+        }, 80);
+        return;
+    }
+
+    // Points mode
+    sessionStorage.setItem('snippit.startMode', 'points');
+    sessionStorage.setItem('snippit.pointsDifficulty', getSelectedPointsDifficulty());
+    setTimeout(() => {
+        window.location.href = 'points.html';
+    }, 80);
+}
+
+function wireModeIntro() {
+    const back = document.getElementById('modeIntroBack');
+    const play = document.getElementById('modeIntroPlay');
+
+    const activate = (el, handler) => {
+        if (!el) return;
+        el.addEventListener('click', handler);
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handler();
+            }
+        });
+    };
+
+    activate(back, hideModeIntro);
+    activate(play, startSelectedMode);
+}
+
 function wireHomeButtons() {
     const endless = document.getElementById('endlessMode');
     const points = document.getElementById('pointsMode');
@@ -45,24 +160,16 @@ function wireHomeButtons() {
         });
     };
 
-    activate(endless, () => {
-        showInitialSpinner();
-        // Mark that we intentionally entered the game from the home screen.
-        sessionStorage.setItem('snippit.startMode', 'endless');
-        // Navigate to the game page; it will run its own loading sequence.
-        setTimeout(() => {
-            window.location.href = 'game.html';
-        }, 80);
-    });
+    // No loading spinner here: we first show the mode intro screen.
+    activate(endless, () => showModeIntro('endless'));
+    activate(points, () => showModeIntro('points'));
+}
 
-    activate(points, () => {
-        showInitialSpinner();
-        // Mark that we intentionally entered the points mode from the home screen.
-        sessionStorage.setItem('snippit.startMode', 'points');
-        setTimeout(() => {
-            window.location.href = 'points.html';
-        }, 80);
-    });
+function homeTitleRollOnce() {
+    const inner = document.querySelector('.home-title__inner');
+    if (!inner) return;
+    if (inner.classList.contains('is-rolling')) return;
+    inner.classList.add('is-rolling');
 }
 
 function wireHomeTitleBarrelRoll() {
@@ -70,22 +177,17 @@ function wireHomeTitleBarrelRoll() {
     const inner = document.querySelector('.home-title__inner');
     if (!title || !inner) return;
 
-    const rollOnce = () => {
-        if (inner.classList.contains('is-rolling')) return;
-        inner.classList.add('is-rolling');
-    };
-
     inner.addEventListener('animationend', (e) => {
         if (e.animationName === 'homeTitleBarrelRoll') {
             inner.classList.remove('is-rolling');
         }
     });
 
-    title.addEventListener('click', rollOnce);
+    title.addEventListener('click', homeTitleRollOnce);
     title.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            rollOnce();
+            homeTitleRollOnce();
         }
     });
 }
@@ -196,6 +298,7 @@ function wireHomeCreditConfetti() {
 
 window.addEventListener('load', () => {
     wireHomeButtons();
+    wireModeIntro();
     wireHomeTitleBarrelRoll();
     wireHomeCreditConfetti();
 
@@ -203,6 +306,9 @@ window.addEventListener('load', () => {
     showInitialSpinner();
     setTimeout(() => {
         showHomeScreen();
+        // One automatic roll when the home screen first appears.
+        // Uses the same logic as click-to-roll, so behavior stays consistent.
+        requestAnimationFrame(homeTitleRollOnce);
         fadeOutInitialSpinner();
     }, INITIAL_LOAD_DELAY_MS);
 });

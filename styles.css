@@ -23,6 +23,7 @@ body {
     background: radial-gradient(1200px 800px at 20% 10%, #1a1a1a 0%, var(--bg) 55%, #0f0f0f 100%);
     color: var(--text);
     overflow: hidden;
+    position: relative;
 }
 
 /* Home screen */
@@ -30,6 +31,165 @@ body {
     position: fixed;
     inset: 0;
     z-index: 900;
+}
+
+/* Mode intro overlay (after picking a mode, before Play) */
+.mode-intro {
+    position: fixed;
+    inset: 0;
+    z-index: 950;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.mode-intro.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.mode-intro[data-mode="endless"] {
+    background:
+        /* Smooth diagonal shadow that originates in the bottom-right corner */
+        linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
+        var(--surface-2);
+}
+
+.mode-intro[data-mode="points"] {
+    /* Dark green with a diagonal black gradient overlay (no new accent color) */
+    background:
+    /* Smooth diagonal shadow that originates in the bottom-right corner */
+    linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
+        linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)),
+        #4CAF50;
+}
+
+.mode-intro__panel {
+    width: min(720px, calc(100% - 24px));
+    border-radius: var(--radius);
+    background: rgba(18, 18, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow);
+    padding: 18px;
+}
+
+.mode-intro__back {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: rgba(36, 36, 36, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow-sm);
+    font-size: 13px;
+    font-weight: 600;
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.mode-intro__back:hover {
+    transform: translateY(-2px) scale(1.04);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow);
+}
+
+.mode-intro__back:active {
+    transform: translateY(0) scale(1.02);
+    box-shadow: var(--shadow-sm);
+}
+
+.mode-intro__title {
+    margin-top: 14px;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+}
+
+.mode-intro__description {
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.88);
+    line-height: 1.45;
+    font-size: 15px;
+    white-space: pre-line;
+}
+
+.mode-intro__difficulty {
+    margin-top: 16px;
+}
+
+.mode-intro__difficulty-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.92);
+    letter-spacing: 0.2px;
+    margin-bottom: 8px;
+}
+
+.mode-intro__difficulty-options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 999px;
+    background: rgba(36, 36, 36, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.mode-chip:hover {
+    transform: translateY(-2px) scale(1.03);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow);
+}
+
+.mode-chip input {
+    accent-color: #4CAF50;
+}
+
+.mode-chip span {
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.mode-intro__play {
+    margin-top: 16px;
+    width: 100%;
+    height: 46px;
+    border-radius: 14px;
+    background: rgba(36, 36, 36, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-sm);
+    font-size: 16px;
+    font-weight: 700;
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.mode-intro__play:hover {
+    transform: translateY(-2px) scale(1.01);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow);
+}
+
+.mode-intro__play:active {
+    transform: translateY(0) scale(1.0);
+    box-shadow: var(--shadow-sm);
 }
 
 .home-title {
@@ -235,6 +395,18 @@ body {
     .home-mode {
         font-size: 26px;
     }
+
+    .home-modes {
+        flex-direction: column;
+    }
+
+    /* Mobile-friendly panel hover (mostly for small desktop windows) */
+    .home-mode--blue:hover,
+    .home-mode--red:hover {
+        transform: scaleY(1.03);
+        transform-origin: center;
+        box-shadow: 0 18px 32px rgba(0, 0, 0, 0.55);
+    }
 }
 
 #container {
@@ -334,7 +506,8 @@ body {
 
 #controls {
     position: absolute;
-    bottom: 22px;
+    /* Slightly lower (closer to bottom) on larger screens */
+    bottom: 18px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
@@ -444,7 +617,121 @@ button.home-button:focus-visible {
     border-radius: var(--radius);
     width: min(520px, calc(100% - 24px));
     box-shadow: var(--shadow);
+    pointer-events: auto;
+    cursor: pointer;
+    position: relative;
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 260ms ease;
+    will-change: transform, opacity;
+    padding-bottom: 36px;
+}
+
+/* Result popup slide-up/slide-down state */
+
+/* During hide animation (slide up + fade) */
+#result.is-hiding {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-120vh);
+}
+
+@supports (height: 100dvh) {
+    #result.is-hiding {
+        transform: translateX(-50%) translateY(-120dvh);
+    }
+}
+
+/* Visual chevron indicator blended into the card (not a separate button) */
+.result-chevron-indicator {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    opacity: 0.95;
     pointer-events: none;
+}
+
+.result-chevron-indicator__img {
+    width: 18px;
+    height: 18px;
+    display: block;
+    /* Make the provided PNG white */
+    filter: brightness(0) invert(1);
+    /* Flip direction (user requested) */
+    transform: rotate(180deg);
+}
+
+/* Show-toggle button (appears after result is hidden) */
+.result-show-toggle {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%) translateX(-64px) translateY(-6px) scale(0.98);
+    z-index: 1400;
+    width: 44px;
+    height: 38px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    background: rgba(36, 36, 36, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
+
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+    transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.result-show-toggle.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateX(-64px) translateY(0) scale(1);
+}
+
+.result-show-toggle:hover {
+    transform: translateX(-50%) translateX(-64px) translateY(0) scale(1.06);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow);
+}
+
+.result-show-toggle:active {
+    transform: translateX(-50%) translateX(-64px) translateY(0) scale(1.02);
+    box-shadow: var(--shadow-sm);
+}
+
+.result-show-toggle:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline-offset: 3px;
+}
+
+.result-show-toggle__img {
+    width: 18px;
+    height: 18px;
+    display: block;
+    filter: brightness(0) invert(1);
+    /* Flip direction (user requested) */
+    transform: rotate(0deg);
+}
+
+/* When result is hidden, shift Leaflet zoom control to top middle-right */
+#map.result-hidden .leaflet-top.leaflet-left {
+    left: 50%;
+    transform: translateX(-50%) translateX(64px);
+}
+
+/* Smooth Leaflet control repositioning */
+#map .leaflet-top.leaflet-left {
+    transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform;
 }
 
 #result h2 {
@@ -490,15 +777,69 @@ body:not([data-mode="points"]) .points-progress {
     display: none;
 }
 
-#hint {
-    background: rgba(30, 30, 30, 0.9);
+/* Dismissible map hint (toast/snackbar) */
+.map-toast {
+    position: absolute;
+    left: 50%;
+    /* Desktop/tablet: sit above the bottom controls so it never covers Guess */
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 1300;
+    /* Keep it compact even when the map gets very wide */
+    width: max-content;
+    max-width: min(520px, calc(100% - 24px));
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    background: rgba(36, 36, 36, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
-    padding: 10px 20px;
-    border-radius: 999px;
-    font-size: 14px;
     box-shadow: var(--shadow-sm);
-    pointer-events: none;
+    border-radius: 999px;
+    padding: 10px 12px;
+
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.15px;
+}
+
+.map-toast__text {
+    line-height: 1.25;
+    max-width: 440px;
+    white-space: normal;
+}
+
+.map-toast__close {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+    box-shadow: none;
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.map-toast__close:hover {
+    transform: scale(1.08);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow-sm);
+}
+
+.map-toast__close:active {
+    transform: scale(1.02);
+    box-shadow: none;
 }
 
 /* Next-round spinner */
@@ -647,6 +988,17 @@ body:not([data-mode="points"]) .points-progress {
     border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
     box-shadow: var(--shadow-sm);
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+#map .leaflet-control-zoom:hover {
+    transform: scale(1.06);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow);
+}
+
+#map .leaflet-control-zoom:active {
+    transform: scale(1.02);
 }
 
 #map .leaflet-control-zoom a {
@@ -672,24 +1024,33 @@ body:not([data-mode="points"]) .points-progress {
 }
 
 @media (max-width: 768px) {
-        .map-overlay {
-            bottom: 92px;
-        }
+    .map-overlay {
+        /* Keep overlays low so the top content (e.g. km distance) isn't clipped in short map panels */
+        bottom: calc(16px + env(safe-area-inset-bottom));
+    }
 
-        #result {
-            width: calc(100% - 24px);
-            max-width: 640px;
-        }
+    #result {
+        width: calc(100% - 24px);
+        max-width: 640px;
+        pointer-events: auto;
+    }
 
-        #hint {
-            width: calc(100% - 24px);
-            text-align: center;
-        }
+    .result-show-toggle {
+        top: calc(12px + env(safe-area-inset-top));
+    }
+
+    .map-toast {
+        bottom: calc(14px + env(safe-area-inset-bottom));
+        width: calc(100% - 24px);
+        justify-content: space-between;
+        text-align: left;
+    }
+
     #container {
         flex-direction: column;
-        height: calc(100vh - 28px);
-        padding: 14px;
-        gap: 14px;
+        height: calc(100dvh - 28px);
+        padding: 12px;
+        gap: 12px;
     }
 
     .splitter {
@@ -698,11 +1059,26 @@ body:not([data-mode="points"]) .points-progress {
 
     #map {
         width: 100%;
-        height: 50vh;
+        flex: 1 1 0;
+        height: auto;
+        min-height: 240px;
     }
 
     #panorama {
-        height: 50vh;
+        flex: 1 1 0;
+        height: auto;
+        min-height: 240px;
+    }
+
+    #controls {
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        padding: 8px;
+        gap: 8px;
+    }
+
+    #controls button {
+        padding: 11px 16px;
+        font-size: 15px;
     }
 
     /* result is anchored inside #map now */

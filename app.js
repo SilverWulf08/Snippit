@@ -18,7 +18,83 @@ let gameInitialized = false;
 const GAME_MODE = (document.body && document.body.dataset && document.body.dataset.mode === 'points') ? 'points' : 'endless';
 const POINTS_ROUNDS_TOTAL = 10;
 const POINTS_GOAL_TOTAL = 1000;
-const POINTS_ROUND_TIME_LIMIT_MS = 2 * 60 * 1000;
+
+const MAP_HINT_DISMISSED_KEY = 'snippit.mapHintDismissed';
+
+function getNavigationType() {
+    try {
+        const entry = performance.getEntriesByType('navigation')[0];
+        if (entry && entry.type) return entry.type;
+
+        // Fallback for older browsers.
+        // 0 = navigate, 1 = reload, 2 = back_forward, 255 = undefined
+        if (performance && performance.navigation && typeof performance.navigation.type === 'number') {
+            if (performance.navigation.type === 1) return 'reload';
+            if (performance.navigation.type === 2) return 'back_forward';
+            if (performance.navigation.type === 0) return 'navigate';
+        }
+
+        return 'unknown';
+    } catch {
+        return 'unknown';
+    }
+}
+
+function clearMapHintOnReload() {
+    // User wants the hint back only when the tab is refreshed.
+    // sessionStorage survives reload, so we explicitly clear the dismissal flag on reload.
+    if (getNavigationType() === 'reload') {
+        sessionStorage.removeItem(MAP_HINT_DISMISSED_KEY);
+    }
+}
+
+function getHintToastEls() {
+    return {
+        toast: document.getElementById('hintToast'),
+        close: document.getElementById('hintToastClose')
+    };
+}
+
+function isMapHintDismissed() {
+    return sessionStorage.getItem(MAP_HINT_DISMISSED_KEY) === '1';
+}
+
+function showMapHintToastIfAllowed() {
+    const { toast } = getHintToastEls();
+    if (!toast) return;
+    if (isMapHintDismissed()) {
+        toast.style.display = 'none';
+        return;
+    }
+    toast.style.display = 'flex';
+}
+
+function hideMapHintToast() {
+    const { toast } = getHintToastEls();
+    if (!toast) return;
+    toast.style.display = 'none';
+}
+
+function wireMapHintToast() {
+    const { toast, close } = getHintToastEls();
+    if (!toast || !close) return;
+
+    close.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sessionStorage.setItem(MAP_HINT_DISMISSED_KEY, '1');
+        hideMapHintToast();
+    });
+}
+
+function getPointsDifficulty() {
+    const v = sessionStorage.getItem('snippit.pointsDifficulty');
+    return v === 'challenging' ? 'challenging' : 'normal';
+}
+
+function getPointsRoundTimeLimitMs() {
+    return getPointsDifficulty() === 'challenging' ? (1 * 60 * 1000) : (2 * 60 * 1000);
+}
 
 let pointsState = null;
 
@@ -107,6 +183,8 @@ function initGameIfNeeded() {
     });
 
     initSplitter();
+    clearMapHintOnReload();
+    wireMapHintToast();
 
     gameInitialized = true;
 }
@@ -127,6 +205,8 @@ function ensurePointsState() {
     if (!isPointsMode()) return null;
     if (pointsState) return pointsState;
     pointsState = {
+        difficulty: getPointsDifficulty(),
+        timeLimitMs: getPointsRoundTimeLimitMs(),
         round: 0,
         totalPoints: 0,
         totalTimeMs: 0,
@@ -140,6 +220,8 @@ function ensurePointsState() {
 function resetPointsState() {
     if (!isPointsMode()) return;
     pointsState = {
+        difficulty: getPointsDifficulty(),
+        timeLimitMs: getPointsRoundTimeLimitMs(),
         round: 0,
         totalPoints: 0,
         totalTimeMs: 0,
@@ -171,7 +253,7 @@ function tickPointsRoundTimer() {
     if (pointsState.roundEnded) return;
 
     const elapsed = Date.now() - pointsState.roundStartMs;
-    const remaining = POINTS_ROUND_TIME_LIMIT_MS - elapsed;
+    const remaining = pointsState.timeLimitMs - elapsed;
 
     setPointsTimerText(formatClockMs(remaining));
 
@@ -184,13 +266,23 @@ function startPointsRoundTimer() {
     if (!pointsState) return;
     stopPointsRoundTimer();
     pointsState.roundStartMs = Date.now();
-    setPointsTimerText(formatClockMs(POINTS_ROUND_TIME_LIMIT_MS));
+    setPointsTimerText(formatClockMs(pointsState.timeLimitMs));
 
     // Tick relatively frequently so it feels responsive.
     pointsState.timerIntervalId = setInterval(tickPointsRoundTimer, 200);
 }
 
-function getBasePointsForDistanceKm(distanceKm) {
+function getBasePointsForDistanceKm(distanceKm, difficulty) {
+    if (difficulty === 'challenging') {
+        if (distanceKm < 10) return 170;
+        if (distanceKm < 50) return 130;
+        if (distanceKm < 200) return 100;
+        if (distanceKm < 500) return 75;
+        if (distanceKm < 1000) return 55;
+        return 35;
+    }
+
+    // Normal
     if (distanceKm < 10) return 200;
     if (distanceKm < 50) return 160;
     if (distanceKm < 200) return 120;
@@ -199,7 +291,12 @@ function getBasePointsForDistanceKm(distanceKm) {
     return 30;
 }
 
-function getSpeedMultiplierForElapsedMs(elapsedMs) {
+function getSpeedMultiplierForElapsedMs(elapsedMs, difficulty) {
+    if (difficulty === 'challenging') {
+        return elapsedMs < 30 * 1000 ? 1.5 : 1;
+    }
+
+    // Normal
     if (elapsedMs < 30 * 1000) return 2;
     if (elapsedMs < 60 * 1000) return 1.5;
     return 1;
@@ -281,7 +378,7 @@ function onPointsRoundTimeout() {
 
     pointsState.roundEnded = true;
     stopPointsRoundTimer();
-    pointsState.totalTimeMs += POINTS_ROUND_TIME_LIMIT_MS;
+    pointsState.totalTimeMs += pointsState.timeLimitMs;
     setPointsTimerText('0:00');
     guessLocked = true;
 
@@ -586,7 +683,6 @@ function newRound() {
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
     const result = document.getElementById('result');
-    const hint = document.getElementById('hint');
 
     if (guessBtn) {
         guessBtn.disabled = true;
@@ -596,8 +692,17 @@ function newRound() {
         nextBtn.disabled = false;
         nextBtn.style.display = 'none';
     }
-    if (result) result.style.display = 'none';
-    if (hint) hint.style.display = 'block';
+    if (result) {
+        result.classList.remove('is-hiding');
+        result.style.display = 'none';
+    }
+    showMapHintToastIfAllowed();
+
+    const mapEl = document.getElementById('map');
+    if (mapEl) mapEl.classList.remove('result-hidden');
+
+    const showToggle = document.getElementById('resultShowToggle');
+    if (showToggle) showToggle.classList.remove('is-visible');
 
     if (isPointsMode()) {
         ensurePointsState();
@@ -634,6 +739,49 @@ function newRound() {
     fadeOutInitialSpinner();
 }
 
+function hideResultAnimated() {
+    const result = document.getElementById('result');
+    const mapEl = document.getElementById('map');
+    const showToggle = document.getElementById('resultShowToggle');
+    if (!result) return;
+
+    if (result.style.display === 'none') return;
+    if (result.classList.contains('is-hiding')) return;
+
+    result.classList.add('is-hiding');
+
+    const onEnd = (e) => {
+        if (e.propertyName !== 'transform') return;
+        result.removeEventListener('transitionend', onEnd);
+        result.style.display = 'none';
+        result.classList.remove('is-hiding');
+        if (mapEl) mapEl.classList.add('result-hidden');
+        if (showToggle) showToggle.classList.add('is-visible');
+    };
+    result.addEventListener('transitionend', onEnd);
+}
+
+function showResultAnimated() {
+    const result = document.getElementById('result');
+    const mapEl = document.getElementById('map');
+    const showToggle = document.getElementById('resultShowToggle');
+    if (!result) return;
+
+    // Only show if we've already rendered content before.
+    if (result.style.display === 'block') return;
+
+    if (showToggle) showToggle.classList.remove('is-visible');
+    if (mapEl) mapEl.classList.remove('result-hidden');
+
+    result.style.display = 'block';
+    // Start from off-screen state, then animate down.
+    result.classList.add('is-hiding');
+    void result.offsetHeight;
+    requestAnimationFrame(() => {
+        result.classList.remove('is-hiding');
+    });
+}
+
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Radius of the Earth in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -658,8 +806,7 @@ function makeGuess() {
 
     guessLocked = true;
 
-    const hint = document.getElementById('hint');
-    if (hint) hint.style.display = 'none';
+    hideMapHintToast();
 
     const distance = calculateDistance(
         guessLocation.lat,
@@ -733,8 +880,8 @@ function makeGuess() {
         const elapsedMs = Math.max(0, Date.now() - pointsState.roundStartMs);
         pointsState.totalTimeMs += elapsedMs;
 
-        const basePoints = getBasePointsForDistanceKm(distance);
-        const multiplier = getSpeedMultiplierForElapsedMs(elapsedMs);
+        const basePoints = getBasePointsForDistanceKm(distance, pointsState.difficulty);
+        const multiplier = getSpeedMultiplierForElapsedMs(elapsedMs, pointsState.difficulty);
         const awarded = Math.round(basePoints * multiplier);
         pointsState.totalPoints += awarded;
 
@@ -777,7 +924,15 @@ function makeGuess() {
     if (resultText) resultText.textContent = message;
     if (actualName) actualName.innerHTML = `<strong>Actual location:</strong> ${currentLocationName}`;
     if (guessedNameEl) guessedNameEl.innerHTML = `<strong>You guessed near:</strong> ${guessedName}`;
-    if (result) result.style.display = 'block';
+    if (result) {
+        result.style.display = 'block';
+        result.classList.remove('is-hiding');
+    }
+
+    const mapEl = document.getElementById('map');
+    if (mapEl) mapEl.classList.remove('result-hidden');
+    const showToggle = document.getElementById('resultShowToggle');
+    if (showToggle) showToggle.classList.remove('is-visible');
 
     // Show next button
     const guessBtn = document.getElementById('guessBtn');
@@ -806,6 +961,15 @@ if (nextBtn) nextBtn.addEventListener('click', () => {
         nextRoundTimer = null;
         newRound();
     }, 500);
+});
+
+const resultEl = document.getElementById('result');
+if (resultEl) resultEl.addEventListener('click', hideResultAnimated);
+
+const resultShowToggle = document.getElementById('resultShowToggle');
+if (resultShowToggle) resultShowToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showResultAnimated();
 });
 
 // Initialize on load
