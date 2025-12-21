@@ -15,9 +15,14 @@ const INITIAL_LOAD_DELAY_MS = 900;
 
 let gameInitialized = false;
 
-const GAME_MODE = (document.body && document.body.dataset && document.body.dataset.mode === 'points') ? 'points' : 'endless';
+const GAME_MODE = (document.body && document.body.dataset && document.body.dataset.mode === 'points')
+    ? 'points'
+    : ((document.body && document.body.dataset && document.body.dataset.mode === 'questions') ? 'questions' : 'endless');
 const POINTS_ROUNDS_TOTAL = 10;
 const POINTS_GOAL_TOTAL = 1000;
+
+const QUESTIONS_USE_POINTS_KEY = 'snippit.questionsUsePoints';
+const QUESTIONS_DIFFICULTY_KEY = 'snippit.questionsDifficulty';
 
 // Tile sources
 // Main map: CARTO Voyager for English labels + good detail.
@@ -87,7 +92,8 @@ function wireMapHintToast() {
 }
 
 function getPointsDifficulty() {
-    const v = sessionStorage.getItem('snippit.pointsDifficulty');
+    const key = (isQuestionsMode() && isQuestionsPointsMode()) ? QUESTIONS_DIFFICULTY_KEY : 'snippit.pointsDifficulty';
+    const v = sessionStorage.getItem(key);
     if (v === 'hard') return 'hard';
     if (v === 'challenging') return 'challenging';
     return 'normal';
@@ -113,6 +119,15 @@ let invalidateScheduled = false;
 // Non-repeating randomizer: each location is used once per cycle.
 let locationDeck = [];
 let lastPickedLocationIndex = null;
+let lastPickedLocationName = '';
+
+// Questions mode deck.
+let questionDeck = [];
+let lastPickedQuestionIndex = null;
+let lastPickedQuestionAnswer = '';
+
+let currentQuestionText = '';
+let currentQuestionFact = '';
 
 function shuffleInPlace(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -127,11 +142,29 @@ function refillLocationDeck() {
     shuffleInPlace(locationDeck);
 
     // Small quality tweak: avoid immediately repeating the last location across a cycle boundary (when possible).
-    if (locationDeck.length > 1 && lastPickedLocationIndex !== null) {
-        const nextIndex = locationDeck[locationDeck.length - 1];
-        if (nextIndex === lastPickedLocationIndex) {
-            const swapWith = locationDeck.length - 2;
-            [locationDeck[locationDeck.length - 1], locationDeck[swapWith]] = [locationDeck[swapWith], locationDeck[locationDeck.length - 1]];
+    // Prefer comparing by name, since the dataset may contain duplicates/variants of the same place.
+    if (locationDeck.length > 1 && (lastPickedLocationIndex !== null || lastPickedLocationName)) {
+        const nextPos = locationDeck.length - 1;
+        const nextIndex = locationDeck[nextPos];
+        const nextName = (locations[nextIndex] && locations[nextIndex].name) ? locations[nextIndex].name : '';
+
+        const repeatsIndex = (lastPickedLocationIndex !== null) && (nextIndex === lastPickedLocationIndex);
+        const repeatsName = !!(lastPickedLocationName && nextName && nextName === lastPickedLocationName);
+
+        if (repeatsIndex || repeatsName) {
+            let swapPos = nextPos - 1;
+            while (swapPos >= 0) {
+                const candIndex = locationDeck[swapPos];
+                const candName = (locations[candIndex] && locations[candIndex].name) ? locations[candIndex].name : '';
+                const okIndex = (lastPickedLocationIndex === null) || (candIndex !== lastPickedLocationIndex);
+                const okName = (!lastPickedLocationName) || (!candName) || (candName !== lastPickedLocationName);
+                if (okIndex && okName) break;
+                swapPos -= 1;
+            }
+
+            if (swapPos >= 0) {
+                [locationDeck[nextPos], locationDeck[swapPos]] = [locationDeck[swapPos], locationDeck[nextPos]];
+            }
         }
     }
 }
@@ -145,9 +178,92 @@ function pickNextLocation() {
         refillLocationDeck();
     }
 
-    const index = locationDeck.pop();
+    // Avoid immediate repeats by *name* as well as by index.
+    // This also helps when the dataset contains multiple entries for the same place.
+    let index = locationDeck.pop();
+    const pickedName = (locations[index] && locations[index].name) ? locations[index].name : '';
+    if (locationDeck.length > 0 && lastPickedLocationName && pickedName === lastPickedLocationName) {
+        let swapPos = locationDeck.length - 1;
+        while (swapPos >= 0) {
+            const candIndex = locationDeck[swapPos];
+            const candName = (locations[candIndex] && locations[candIndex].name) ? locations[candIndex].name : '';
+            if (candName !== lastPickedLocationName) break;
+            swapPos -= 1;
+        }
+
+        if (swapPos >= 0) {
+            const altIndex = locationDeck[swapPos];
+            locationDeck[swapPos] = index;
+            index = altIndex;
+        }
+    }
+
     lastPickedLocationIndex = index;
+    lastPickedLocationName = locations[index] ? locations[index].name : '';
     return locations[index];
+}
+
+function refillQuestionDeck() {
+    questionDeck = questions.map((_, idx) => idx);
+    shuffleInPlace(questionDeck);
+
+    if (questionDeck.length > 1 && (lastPickedQuestionIndex !== null || lastPickedQuestionAnswer)) {
+        const nextPos = questionDeck.length - 1;
+        const nextIndex = questionDeck[nextPos];
+        const nextAnswer = (questions[nextIndex] && questions[nextIndex].answer) ? questions[nextIndex].answer : '';
+
+        const repeatsIndex = (lastPickedQuestionIndex !== null) && (nextIndex === lastPickedQuestionIndex);
+        const repeatsAnswer = !!(lastPickedQuestionAnswer && nextAnswer && nextAnswer === lastPickedQuestionAnswer);
+
+        if (repeatsIndex || repeatsAnswer) {
+            let swapPos = nextPos - 1;
+            while (swapPos >= 0) {
+                const candIndex = questionDeck[swapPos];
+                const candAnswer = (questions[candIndex] && questions[candIndex].answer) ? questions[candIndex].answer : '';
+                const okIndex = (lastPickedQuestionIndex === null) || (candIndex !== lastPickedQuestionIndex);
+                const okAnswer = (!lastPickedQuestionAnswer) || (!candAnswer) || (candAnswer !== lastPickedQuestionAnswer);
+                if (okIndex && okAnswer) break;
+                swapPos -= 1;
+            }
+
+            if (swapPos >= 0) {
+                [questionDeck[nextPos], questionDeck[swapPos]] = [questionDeck[swapPos], questionDeck[nextPos]];
+            }
+        }
+    }
+}
+
+function pickNextQuestion() {
+    if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error('No questions available. Check questions.js');
+    }
+
+    if (questionDeck.length === 0) {
+        refillQuestionDeck();
+    }
+
+    // Avoid immediate repeats by *answer* as well as by index.
+    let index = questionDeck.pop();
+    const pickedAnswer = (questions[index] && questions[index].answer) ? questions[index].answer : '';
+    if (questionDeck.length > 0 && lastPickedQuestionAnswer && pickedAnswer === lastPickedQuestionAnswer) {
+        let swapPos = questionDeck.length - 1;
+        while (swapPos >= 0) {
+            const candIndex = questionDeck[swapPos];
+            const candAnswer = (questions[candIndex] && questions[candIndex].answer) ? questions[candIndex].answer : '';
+            if (candAnswer !== lastPickedQuestionAnswer) break;
+            swapPos -= 1;
+        }
+
+        if (swapPos >= 0) {
+            const altIndex = questionDeck[swapPos];
+            questionDeck[swapPos] = index;
+            index = altIndex;
+        }
+    }
+
+    lastPickedQuestionIndex = index;
+    lastPickedQuestionAnswer = questions[index] ? questions[index].answer : '';
+    return questions[index];
 }
 
 function initGameIfNeeded() {
@@ -197,6 +313,19 @@ function initGameIfNeeded() {
     clearMapHintOnReload();
     wireMapHintToast();
 
+    // Questions mode can optionally run with Points scoring; drive UI visibility via a class.
+    if (document.body) {
+        document.body.classList.toggle('is-points-scoring', isPointsScoringMode());
+    }
+
+    // Safety: if this page isn't a points-scoring session, drop any stale state.
+    if (!isPointsScoringMode()) {
+        if (pointsState && pointsState.timerIntervalId) {
+            clearInterval(pointsState.timerIntervalId);
+        }
+        pointsState = null;
+    }
+
     gameInitialized = true;
 }
 
@@ -212,8 +341,30 @@ function isPointsMode() {
     return GAME_MODE === 'points';
 }
 
+function isQuestionsMode() {
+    return GAME_MODE === 'questions';
+}
+
+function isQuestionsPointsMode() {
+    return sessionStorage.getItem(QUESTIONS_USE_POINTS_KEY) === '1';
+}
+
+function isPointsScoringMode() {
+    return isPointsMode() || (isQuestionsMode() && isQuestionsPointsMode());
+}
+
+function setQuestionText(text) {
+    currentQuestionText = text || '';
+    const el = document.getElementById('questionText');
+    if (el) el.textContent = currentQuestionText;
+}
+
+function setQuestionFact(text) {
+    currentQuestionFact = text || '';
+}
+
 function ensurePointsState() {
-    if (!isPointsMode()) return null;
+    if (!isPointsScoringMode()) return null;
     if (pointsState) return pointsState;
     pointsState = {
         difficulty: getPointsDifficulty(),
@@ -229,7 +380,7 @@ function ensurePointsState() {
 }
 
 function resetPointsState() {
-    if (!isPointsMode()) return;
+    if (!isPointsScoringMode()) return;
     pointsState = {
         difficulty: getPointsDifficulty(),
         timeLimitMs: getPointsRoundTimeLimitMs(),
@@ -332,6 +483,11 @@ function showPointsSummaryOverlay() {
     const overlay = document.getElementById('pointsSummaryOverlay');
     if (!overlay) return;
 
+    const titleEl = document.getElementById('pointsSummaryTitle');
+    if (titleEl) {
+        titleEl.textContent = isQuestionsMode() ? 'Questions (Points)' : 'Points Mode';
+    }
+
     const scoreEl = document.getElementById('pointsSummaryScore');
     const goalEl = document.getElementById('pointsSummaryGoal');
     const roundsEl = document.getElementById('pointsSummaryRounds');
@@ -369,7 +525,7 @@ function hidePointsSummaryOverlay() {
 }
 
 function wirePointsSummaryActions() {
-    if (!isPointsMode()) return;
+    if (!isPointsScoringMode()) return;
 
     const retryBtn = document.getElementById('pointsRetryBtn');
     const homeBtn = document.getElementById('pointsHomeBtn');
@@ -525,6 +681,8 @@ function applyMapWidthPx(mapWidthPx) {
     scheduleInvalidateSizes();
 }
 
+let splitterHasUserSetWidth = false;
+
 function clearMapWidthOverride() {
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
@@ -559,6 +717,17 @@ function initSplitter() {
             return;
         }
 
+        // Questions mode: default to a maximized map panel on larger screens.
+        // Keep the user's chosen width after they drag the splitter.
+        if (isQuestionsMode() && !splitterHasUserSetWidth) {
+            const containerWidth = container.getBoundingClientRect().width;
+            const splitterWidth = splitter.getBoundingClientRect().width;
+            const maxMapWidth = Math.max(0, containerWidth - splitterWidth - MIN_PANORAMA_WIDTH_PX);
+            const nextWidth = clampMapWidthPx(maxMapWidth);
+            applyMapWidthPx(nextWidth);
+            return;
+        }
+
         // Ensure we start from a sensible width and keep it clamped on resizes.
         const currentWidth = mapEl.getBoundingClientRect().width || currentMapWidthPx;
         const nextWidth = clampMapWidthPx(currentWidth || DEFAULT_MAP_WIDTH_PX);
@@ -585,6 +754,7 @@ function initSplitter() {
     const stopDrag = () => {
         if (!dragging) return;
         dragging = false;
+        splitterHasUserSetWidth = true;
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         scheduleInvalidateSizes();
@@ -652,16 +822,16 @@ function createMiniMap(lat, lng) {
     }
 
     const container = document.getElementById('miniMap');
-    if (container) {
-        // Reset Leaflet internal id + DOM content for safe re-init
-        container.innerHTML = '';
-        if (container._leaflet_id) {
-            delete container._leaflet_id;
-        }
+    if (!container) return;
+
+    // Reset Leaflet internal id + DOM content for safe re-init
+    container.innerHTML = '';
+    if (container._leaflet_id) {
+        delete container._leaflet_id;
     }
 
     // Create mini map showing zoomed-in view of the location
-    miniMap = L.map('miniMap', {
+    miniMap = L.map(container, {
         center: [lat, lng],
         zoom: 16, // More zoomed-in so it's harder to recognize instantly
         zoomControl: false,
@@ -737,6 +907,13 @@ function newRound() {
         result.classList.remove('is-hiding');
         result.style.display = 'none';
     }
+
+    const factEl = document.getElementById('factText');
+    if (factEl) {
+        factEl.style.display = 'none';
+        factEl.textContent = '';
+    }
+    setQuestionFact('');
     showMapHintToastIfAllowed();
 
     const mapEl = document.getElementById('map');
@@ -745,7 +922,7 @@ function newRound() {
     const showToggle = document.getElementById('resultShowToggle');
     if (showToggle) showToggle.classList.remove('is-visible');
 
-    if (isPointsMode()) {
+    if (isPointsScoringMode()) {
         ensurePointsState();
         pointsState.roundEnded = false;
 
@@ -768,13 +945,28 @@ function newRound() {
         startPointsRoundTimer();
     }
 
-    // Get random location
-    const location = pickNextLocation();
-    actualLocation = { lat: location.lat, lng: location.lng };
-    currentLocationName = location.name;
+    if (isQuestionsMode()) {
+        const q = pickNextQuestion();
+        actualLocation = { lat: q.lat, lng: q.lng };
+        currentLocationName = q.answer;
+        setQuestionText(q.question);
+        setQuestionFact(q.fact || '');
 
-    // Create mini-map showing zoomed-in view
-    createMiniMap(location.lat, location.lng);
+        // No minimap in Questions mode.
+        if (miniMap) {
+            miniMap.off();
+            miniMap.remove();
+            miniMap = null;
+        }
+    } else {
+        // Get random location
+        const location = pickNextLocation();
+        actualLocation = { lat: location.lat, lng: location.lng };
+        currentLocationName = location.name;
+
+        // Create mini-map showing zoomed-in view
+        createMiniMap(location.lat, location.lng);
+    }
 
     // Reset main map view
     map.setView([20, 0], 2);
@@ -841,7 +1033,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 function makeGuess() {
     if (!guessLocation) return;
 
-    if (isPointsMode()) {
+    if (isPointsScoringMode()) {
         ensurePointsState();
         if (pointsState.roundEnded) return;
         pointsState.roundEnded = true;
@@ -893,11 +1085,13 @@ function makeGuess() {
     // Find the closest location name for the guess
     let guessedName = 'Unknown';
     let minDistance = Infinity;
-    for (const loc of locations) {
-        const dist = calculateDistance(guessLocation.lat, guessLocation.lng, loc.lat, loc.lng);
-        if (dist < minDistance) {
-            minDistance = dist;
-            guessedName = loc.name;
+    if (Array.isArray(locations)) {
+        for (const loc of locations) {
+            const dist = calculateDistance(guessLocation.lat, guessLocation.lng, loc.lat, loc.lng);
+            if (dist < minDistance) {
+                minDistance = dist;
+                guessedName = loc.name;
+            }
         }
     }
 
@@ -920,7 +1114,7 @@ function makeGuess() {
         message = '🌍 Keep practicing!';
     }
 
-    if (isPointsMode()) {
+    if (isPointsScoringMode()) {
         const elapsedMs = Math.max(0, Date.now() - pointsState.roundStartMs);
         pointsState.totalTimeMs += elapsedMs;
 
@@ -968,9 +1162,19 @@ function makeGuess() {
     const actualName = document.getElementById('actualLocationName');
     const guessedNameEl = document.getElementById('guessedLocationName');
     const result = document.getElementById('result');
+    const factEl = document.getElementById('factText');
     if (resultText) resultText.textContent = message;
     if (actualName) actualName.innerHTML = `<strong>Actual location:</strong> ${currentLocationName}`;
     if (guessedNameEl) guessedNameEl.innerHTML = `<strong>You guessed near:</strong> ${guessedName}`;
+    if (factEl) {
+        if (isQuestionsMode() && currentQuestionFact) {
+            factEl.textContent = currentQuestionFact;
+            factEl.style.display = 'block';
+        } else {
+            factEl.textContent = '';
+            factEl.style.display = 'none';
+        }
+    }
     if (result) {
         result.style.display = 'block';
         result.classList.remove('is-hiding');
@@ -985,8 +1189,8 @@ function makeGuess() {
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
     if (guessBtn) guessBtn.style.display = 'none';
-    if (nextBtn && !isPointsMode()) nextBtn.style.display = 'block';
-    if (nextBtn && isPointsMode() && pointsState.round < POINTS_ROUNDS_TOTAL) nextBtn.style.display = 'block';
+    if (nextBtn && !isPointsScoringMode()) nextBtn.style.display = 'block';
+    if (nextBtn && isPointsScoringMode() && pointsState.round < POINTS_ROUNDS_TOTAL && pointsState.totalPoints < POINTS_GOAL_TOTAL) nextBtn.style.display = 'block';
 }
 
 // Event listeners
@@ -1025,7 +1229,7 @@ window.addEventListener('load', () => {
     showInitialSpinner();
     setTimeout(() => {
         initGameIfNeeded();
-        if (isPointsMode()) {
+        if (isPointsScoringMode()) {
             resetPointsState();
             wirePointsSummaryActions();
         }

@@ -31,6 +31,7 @@ body {
     position: fixed;
     inset: 0;
     z-index: 900;
+    overflow: hidden;
 }
 
 /* Mode intro overlay (after picking a mode, before Play) */
@@ -75,6 +76,15 @@ body {
     linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
         linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)),
         #4CAF50;
+}
+
+.mode-intro[data-mode="questions"] {
+    /* Yellow with a diagonal black gradient overlay (use the same yellow as the km distance indicator) */
+    background:
+    /* Smooth diagonal shadow that originates in the bottom-right corner */
+    linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
+        linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)),
+        #ffd700;
 }
 
 .mode-intro__panel {
@@ -144,6 +154,10 @@ body {
     flex-wrap: wrap;
 }
 
+.mode-intro__difficulty-inner {
+    margin-top: 12px;
+}
+
 .mode-chip {
     display: inline-flex;
     align-items: center;
@@ -166,6 +180,10 @@ body {
 
 .mode-chip input {
     accent-color: #4CAF50;
+}
+
+.mode-intro[data-mode="questions"] .mode-chip input {
+    accent-color: #ffd700;
 }
 
 .mode-chip span {
@@ -280,6 +298,7 @@ body {
     inset: 0;
     display: flex;
     z-index: 1;
+    background: transparent;
 }
 
 .home-credit-pill {
@@ -376,7 +395,15 @@ body {
     position: relative;
     overflow: hidden;
     isolation: isolate;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
     transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+/* Eliminate subpixel seams between flex cards on desktop */
+.home-mode + .home-mode {
+    margin-left: -1px;
 }
 
 .home-mode__label {
@@ -419,12 +446,26 @@ body {
     background: #4CAF50;
 }
 
-.home-mode--blue:hover {
+.home-mode--yellow {
+    /* Questions mode: same yellow as the km distance indicator */
+    background: #ffd700;
+}
+
+.home-mode--yellow:hover {
     transform: scaleX(1.05);
     transform-origin: left center;
     z-index: 2;
     filter: brightness(1.06);
     box-shadow: 18px 0 32px rgba(0, 0, 0, 0.55);
+}
+
+.home-mode--blue:hover {
+    /* Middle card: expand over both sides */
+    transform: scaleX(1.05);
+    transform-origin: center;
+    z-index: 2;
+    filter: brightness(1.06);
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.55);
 }
 
 .home-mode--red:hover {
@@ -441,6 +482,7 @@ body {
     transform: translateY(0);
 }
 
+.home-mode--yellow:hover::before,
 .home-mode--blue:hover::before,
 .home-mode--red:hover::before {
     background: rgba(0, 0, 0, 0.58);
@@ -456,9 +498,9 @@ body {
     inset: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 720px) {
     .home-title {
-        top: 30px;
+        top: calc(30px + env(safe-area-inset-top));
         font-size: 48px;
     }
 
@@ -468,17 +510,74 @@ body {
         margin-right: 8px;
     }
 
-    .home-mode {
-        font-size: 26px;
+    /* Small screens: keep the page non-scrollable and put the 3 mode cards inside
+       a game-like rounded frame (title sits above the frame; credit/help sit below). */
+    .home-screen {
+        overflow: hidden;
+        background: #000;
     }
 
     .home-modes {
-        flex-direction: column;
+        display: grid;
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: calc(92px + env(safe-area-inset-top));
+        bottom: calc(86px + env(safe-area-inset-bottom));
+        margin: auto;
+        width: min(640px, calc(100% - 36px));
+        height: clamp(440px, calc(100vh - 220px), 740px);
+
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+
+    @supports (height: 100dvh) {
+        .home-modes {
+            height: clamp(440px, calc(100dvh - 220px), 740px);
+        }
+    }
+
+    .home-mode {
+        min-height: 0;
+        font-size: 24px;
+    }
+
+    /* Small-window card order: Classic -> Points -> Questions */
+    #endlessMode {
+        order: 1;
+    }
+
+    #pointsMode {
+        order: 2;
+    }
+
+    #questionsMode {
+        order: 3;
+    }
+
+    /* In the framed (stacked) layout, overlap borders vertically instead of horizontally */
+    .home-mode + .home-mode {
+        margin-left: 0;
+        margin-top: -1px;
+    }
+
+    .home-credit-pill {
+        bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+
+    .home-help-button {
+        bottom: calc(18px + env(safe-area-inset-bottom));
     }
 
     /* Mobile-friendly panel hover (mostly for small desktop windows) */
     .home-mode--blue:hover,
-    .home-mode--red:hover {
+    .home-mode--red:hover,
+    .home-mode--yellow:hover {
         transform: scaleY(1.03);
         transform-origin: center;
         box-shadow: 0 18px 32px rgba(0, 0, 0, 0.55);
@@ -543,6 +642,49 @@ body {
 #miniMap {
     width: 100%;
     height: 100%;
+}
+
+/* Questions mode: question panel replaces the snippit minimap */
+.question-panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+
+.question-panel__card {
+    width: min(720px, calc(100% - 24px));
+    border-radius: var(--radius);
+    background: rgba(18, 18, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow);
+    padding: 18px;
+    text-align: center;
+}
+
+.question-panel__kicker {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.28px;
+    color: rgba(255, 255, 255, 0.78);
+    text-transform: uppercase;
+}
+
+.question-panel__text {
+    margin-top: 12px;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.25;
+    color: rgba(255, 255, 255, 0.96);
+}
+
+@media (max-width: 768px) {
+    .question-panel__text {
+        font-size: 20px;
+    }
 }
 
 /* Points mode: round timer badge (top-center of Snippit) */
@@ -836,6 +978,20 @@ button.home-button:focus-visible {
     color: #fff;
 }
 
+.result-fact {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.84);
+    text-align: left;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    line-clamp: 3;
+    box-orient: vertical;
+    overflow: hidden;
+}
+
 .points-progress {
     margin-top: 10px;
     text-align: center;
@@ -872,6 +1028,27 @@ body:not([data-mode="points"]) .points-progress {
 body:not([data-mode="points"]) .points-round-progress,
 body:not([data-mode="points"]) .points-stats-row {
     display: none;
+}
+
+/* Questions can optionally run with Points scoring */
+body[data-mode="questions"] #pointsTimer {
+    display: none;
+}
+
+body[data-mode="questions"].is-points-scoring #pointsTimer {
+    display: block;
+}
+
+body[data-mode="questions"].is-points-scoring .points-progress {
+    display: block;
+}
+
+body[data-mode="questions"].is-points-scoring .points-round-progress {
+    display: block;
+}
+
+body[data-mode="questions"].is-points-scoring .points-stats-row {
+    display: flex;
 }
 
 /* Dismissible map hint (toast/snackbar) */

@@ -3,6 +3,11 @@ let initialSpinnerDismissed = false;
 
 clearMapHintOnReload();
 
+// Questions intro should default to Classic/no-points.
+// We still store the choice when starting the mode, but we reset it when returning home.
+sessionStorage.removeItem('snippit.questionsUsePoints');
+sessionStorage.removeItem('snippit.questionsDifficulty');
+
 function showInitialSpinner() {
     const el = document.getElementById('initialSpinner');
     if (!el) return;
@@ -34,6 +39,9 @@ function showHomeScreen() {
 
 let pendingMode = null;
 
+const QUESTIONS_USE_POINTS_KEY = 'snippit.questionsUsePoints';
+const QUESTIONS_DIFFICULTY_KEY = 'snippit.questionsDifficulty';
+
 function setModeIntroVisible(visible) {
     const intro = document.getElementById('modeIntro');
     if (!intro) return;
@@ -48,6 +56,8 @@ function showModeIntro(mode) {
     const title = document.getElementById('modeIntroTitle');
     const desc = document.getElementById('modeIntroDescription');
     const diff = document.getElementById('modeIntroPointsDifficulty');
+    const qScoring = document.getElementById('modeIntroQuestionsScoring');
+    const qDiff = document.getElementById('modeIntroQuestionsDifficulty');
     const back = document.getElementById('modeIntroBack');
     const play = document.getElementById('modeIntroPlay');
     if (!intro || !title || !desc || !diff) return;
@@ -62,18 +72,37 @@ function showModeIntro(mode) {
 
     if (mode === 'endless') {
         title.textContent = 'Classic mode';
-        desc.textContent = 'Play as many rounds as you like. After each guess you\'ll see how far off you were, so you can keep improving your world knowledge.';
+        desc.textContent = 'Play as many rounds of Snippit as you like trying to guess the location on the map. After each guess you\'ll see how far off you were, so you can keep improving your world knowledge.';
         diff.style.display = 'none';
+        if (qScoring) qScoring.style.display = 'none';
+    } else if (mode === 'questions') {
+        title.textContent = 'Questions mode';
+        desc.textContent =
+            'Answer short prompts by guessing the correct spot on the world map.\n\n' +
+            'Expect questions about places, famous people, historic events, landmarks, and food — enough variety to keep it surprising.\n\n' +
+            'Classic way: keep playing at your own pace.\n' +
+            'With Points: 10 rounds, reach 1000 points. You score based on distance (closer = more points) plus a speed bonus. If time runs out, the round ends with 0 points.';
+        diff.style.display = 'none';
+        if (qScoring) qScoring.style.display = 'block';
+
+        // Default state: Classic way (no points)
+        const classicRadio = document.querySelector('input[name="questionsScoring"][value="classic"]');
+        if (classicRadio) classicRadio.checked = true;
+        if (qDiff) qDiff.style.display = 'none';
+
+        const normalDiff = document.querySelector('input[name="questionsDifficulty"][value="normal"]');
+        if (normalDiff) normalDiff.checked = true;
     } else if (mode === 'points') {
         title.textContent = 'Points mode';
         desc.textContent =
-            'Play 10 rounds and try to reach 1000 points.\n' +
+            'Play 10 rounds of Snippit and try to reach 1000 points.\n' +
             'Points are based on distance (closer = more points) and a speed bonus.\n' +
             'If time runs out, the round ends with 0 points and auto-advances.\n\n' +
             'Normal: 2:00 per round. Speed bonus: 2x (under 30s), 1.5x (under 60s).\n' +
             'Challenging: 1:00 per round. Reduced distance points. Speed bonus: 1.5x (under 30s).\n' +
             'Hard: 0:30 per round. Very tough distance points. Speed bonus: 2x (under 10s).';
         diff.style.display = 'block';
+        if (qScoring) qScoring.style.display = 'none';
     } else {
         // Help / about screen
         title.textContent = 'What is Snippit?';
@@ -82,8 +111,10 @@ function showModeIntro(mode) {
             'You see a zoomed-in mini-map (the “snippit”) and you try to place your guess on the big world map.\n' +
             'After guessing you\'ll see the distance between your guess and the real location.\n\n' +
             'Classic mode: keep playing and improve.\n' +
+            'Questions mode: answer questions based on the snippit.\n' +
             'Points mode: 10 rounds, reach 1000 points — accuracy + speed matter.';
         diff.style.display = 'none';
+        if (qScoring) qScoring.style.display = 'none';
 
         // Spec: big Back button instead of Play for this screen.
         if (back) back.style.display = 'none';
@@ -101,6 +132,21 @@ function hideModeIntro() {
 function getSelectedPointsDifficulty() {
     const selected = document.querySelector('input[name="pointsDifficulty"]:checked');
     return selected ? selected.value : 'normal';
+}
+
+function getQuestionsUsePointsSelected() {
+    const el = document.getElementById('questionsUsePointsToggle');
+    return !!(el && el.checked);
+}
+
+function getSelectedQuestionsDifficulty() {
+    const selected = document.querySelector('input[name="questionsDifficulty"]:checked');
+    return selected ? selected.value : 'normal';
+}
+
+function getSelectedQuestionsScoring() {
+    const selected = document.querySelector('input[name="questionsScoring"]:checked');
+    return selected ? selected.value : 'classic';
 }
 
 function startSelectedMode() {
@@ -121,6 +167,24 @@ function startSelectedMode() {
         return;
     }
 
+    if (pendingMode === 'questions') {
+        sessionStorage.setItem('snippit.startMode', 'questions');
+
+        const usePoints = getSelectedQuestionsScoring() === 'points';
+        if (usePoints) {
+            sessionStorage.setItem(QUESTIONS_USE_POINTS_KEY, '1');
+            sessionStorage.setItem(QUESTIONS_DIFFICULTY_KEY, getSelectedQuestionsDifficulty());
+        } else {
+            sessionStorage.removeItem(QUESTIONS_USE_POINTS_KEY);
+            sessionStorage.removeItem(QUESTIONS_DIFFICULTY_KEY);
+        }
+
+        setTimeout(() => {
+            window.location.href = 'questions.html';
+        }, 80);
+        return;
+    }
+
     // Points mode
     sessionStorage.setItem('snippit.startMode', 'points');
     sessionStorage.setItem('snippit.pointsDifficulty', getSelectedPointsDifficulty());
@@ -132,6 +196,7 @@ function startSelectedMode() {
 function wireModeIntro() {
     const back = document.getElementById('modeIntroBack');
     const play = document.getElementById('modeIntroPlay');
+    const qDiff = document.getElementById('modeIntroQuestionsDifficulty');
 
     const activate = (el, handler) => {
         if (!el) return;
@@ -146,11 +211,29 @@ function wireModeIntro() {
 
     activate(back, hideModeIntro);
     activate(play, startSelectedMode);
+
+    if (qDiff) {
+        const updateQuestionsDifficultyVisibility = () => {
+            const v = getSelectedQuestionsScoring();
+            qDiff.style.display = (v === 'points') ? 'block' : 'none';
+        };
+
+        document.addEventListener('change', (e) => {
+            const t = e.target;
+            if (!(t instanceof HTMLInputElement)) return;
+            if (t.name === 'questionsScoring') {
+                updateQuestionsDifficultyVisibility();
+            }
+        });
+
+        updateQuestionsDifficultyVisibility();
+    }
 }
 
 function wireHomeButtons() {
     const endless = document.getElementById('endlessMode');
     const points = document.getElementById('pointsMode');
+    const questions = document.getElementById('questionsMode');
     const help = document.getElementById('homeHelpBtn');
 
     const activate = (el, handler) => {
@@ -165,6 +248,7 @@ function wireHomeButtons() {
     };
 
     // No loading spinner here: we first show the mode intro screen.
+    activate(questions, () => showModeIntro('questions'));
     activate(endless, () => showModeIntro('endless'));
     activate(points, () => showModeIntro('points'));
     activate(help, () => showModeIntro('help'));

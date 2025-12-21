@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snippit Questions</title>
+    <link rel="icon" href="white compass.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-mode="questions">
+    <script>
+        // Refreshing or directly opening the questions page should return to the home screen.
+        // Only allow entry if navigated from the home screen (set by home.js).
+        (() => {
+            const key = 'snippit.startMode';
+            const mode = sessionStorage.getItem(key);
+            if (mode !== 'questions') {
+                window.location.replace('index.html');
+                return;
+            }
+            sessionStorage.removeItem(key);
+        })();
+    </script>
+
+    <!-- Initial page-load spinner (solid black background + white compass, fades out) -->
+    <div id="initialSpinner" class="spinner-overlay spinner-overlay--initial" style="display: flex;" aria-hidden="true">
+        <img class="compass-spinner" src="white compass.png" alt="Loading" />
+    </div>
+
+    <!-- Next-round spinner (blurred overlay + dark-gray compass) -->
+    <div id="roundSpinner" class="spinner-overlay" style="display: none;" aria-hidden="true">
+        <img class="compass-spinner compass-spinner--between-rounds" src="white compass.png" alt="Loading" />
+    </div>
+
+    <div id="container">
+        <div id="panorama">
+            <button id="homeButton" class="home-button" type="button" onclick="window.location.href='index.html'">Home</button>
+            <div id="pointsTimer" class="points-timer" aria-live="polite">2:00</div>
+            <div id="questionPanel" class="question-panel" role="region" aria-label="Question">
+                <div class="question-panel__card">
+                    <div class="question-panel__kicker">Question</div>
+                    <div id="questionText" class="question-panel__text">Loading question…</div>
+                </div>
+            </div>
+        </div>
+        <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>
+        <div id="map">
+            <div id="hintToast" class="map-toast" role="status" aria-live="polite" style="display:none;">
+                <div class="map-toast__text">click on this map to place a guess!</div>
+                <button id="hintToastClose" class="map-toast__close" type="button" aria-label="Dismiss hint">×</button>
+            </div>
+
+            <div id="result" class="map-overlay" style="display: none;">
+                <div class="result-content">
+                    <h2>Result</h2>
+                <div class="distance" id="distance"></div>
+                <p id="resultText"></p>
+                <div class="points-stats-row">
+                    <div id="pointsProgress" class="points-progress">0/1000</div>
+                    <div id="roundProgress" class="points-round-progress">0/10</div>
+                </div>
+                <p class="location-info" id="actualLocationName"></p>
+                <p class="location-info" id="guessedLocationName"></p>
+                <p id="factText" class="result-fact" style="display:none;"></p>
+                </div>
+
+                <div class="result-chevron-indicator" aria-hidden="true">
+                    <img class="result-chevron-indicator__img" src="chevron.png" alt="" aria-hidden="true" />
+                </div>
+            </div>
+
+            <button id="resultShowToggle" class="result-show-toggle" type="button" aria-label="Show result">
+                <img class="result-show-toggle__img" src="chevron.png" alt="" aria-hidden="true" />
+            </button>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="guessBtn" disabled>Guess!</button>
+        <button id="nextBtn" style="display: none;">Next Round</button>
+    </div>
+
+    <!-- End-of-game summary overlay (reused for Questions with Points) -->
+    <div id="pointsSummaryOverlay" class="points-summary-overlay" style="display:none;" aria-hidden="true">
+        <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
+        <div class="points-summary-card" role="dialog" aria-modal="true" aria-labelledby="pointsSummaryTitle">
+            <div id="pointsSummaryTitle" class="points-summary-title">Points Mode</div>
+            <div class="points-summary-body">
+                <div id="pointsSummaryScore" class="points-summary-score"></div>
+                <div id="pointsSummaryGoal" class="points-summary-goal"></div>
+                <div id="pointsSummaryRounds" class="points-summary-rounds" style="display:none;"></div>
+                <div id="pointsSummaryTime" class="points-summary-time"></div>
+            </div>
+            <div class="points-summary-actions">
+                <button id="pointsRetryBtn" type="button">
+                    <span class="retry-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" focusable="false" aria-hidden="true">
+                            <path fill="currentColor" d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5a5 5 0 0 1-8.66 3.54l-1.42 1.42A7 7 0 0 0 19 13c0-3.87-3.13-7-7-7z"/>
+                        </svg>
+                    </span>
+                    Retry
+                </button>
+                <button id="pointsHomeBtn" type="button">Home</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="locations.js"></script>
+    <script src="questions.js"></script>
+    <script src="shared.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

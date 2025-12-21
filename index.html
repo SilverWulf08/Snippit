@@ -24,13 +24,17 @@
             </span>
         </div>
         <div class="home-modes" role="group" aria-label="Game modes">
+            <div id="questionsMode" class="home-mode home-mode--yellow" role="button" tabindex="0" aria-label="Questions mode">
+                <span class="home-mode__label">Questions mode</span>
+                <span class="home-mode__description">Answer questions by guessing the location on the map.</span>
+            </div>
             <div id="endlessMode" class="home-mode home-mode--blue" role="button" tabindex="0" aria-label="Classic mode">
                 <span class="home-mode__label">Classic mode</span>
-                <span class="home-mode__description">Play forever and improve your guessing skills.</span>
+                <span class="home-mode__description">Play Classic Snippit by guessing the location on the map.</span>
             </div>
             <div id="pointsMode" class="home-mode home-mode--red" role="button" tabindex="0" aria-label="Points mode">
                 <span class="home-mode__label">Points mode</span>
-                <span class="home-mode__description">Score points for accuracy (and speed) across 10 rounds.</span>
+                <span class="home-mode__description">Score points for accuracy (and speed) across 10 rounds of Snippit.</span>
             </div>
         </div>
 
@@ -64,6 +68,38 @@
                         <input type="radio" name="pointsDifficulty" value="hard" />
                         <span>Hard</span>
                     </label>
+                </div>
+            </div>
+
+            <div id="modeIntroQuestionsScoring" class="mode-intro__difficulty" style="display:none;" aria-label="Questions scoring">
+                <div class="mode-intro__difficulty-title">Play style</div>
+                <div class="mode-intro__difficulty-options" role="radiogroup" aria-label="Select play style">
+                    <label class="mode-chip">
+                        <input type="radio" name="questionsScoring" value="classic" checked />
+                        <span>Classic way</span>
+                    </label>
+                    <label class="mode-chip">
+                        <input type="radio" name="questionsScoring" value="points" />
+                        <span>With Points</span>
+                    </label>
+                </div>
+
+                <div id="modeIntroQuestionsDifficulty" class="mode-intro__difficulty-inner" style="display:none;" aria-label="Questions difficulty">
+                    <div class="mode-intro__difficulty-title">Difficulty</div>
+                    <div class="mode-intro__difficulty-options" role="radiogroup" aria-label="Select difficulty">
+                        <label class="mode-chip">
+                            <input type="radio" name="questionsDifficulty" value="normal" checked />
+                            <span>Normal</span>
+                        </label>
+                        <label class="mode-chip">
+                            <input type="radio" name="questionsDifficulty" value="challenging" />
+                            <span>Challenging</span>
+                        </label>
+                        <label class="mode-chip">
+                            <input type="radio" name="questionsDifficulty" value="hard" />
+                            <span>Hard</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
