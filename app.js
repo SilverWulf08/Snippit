@@ -48,7 +48,18 @@ function showMapHintToastIfAllowed() {
         toast.style.display = 'none';
         return;
     }
+
     toast.style.display = 'flex';
+
+    // Pop animation only when the hint is shown for the first time in this tab session
+    // (and again after a hard refresh, since shared.js clears MAP_HINT_POP_SHOWN_KEY on reload).
+    if (sessionStorage.getItem(MAP_HINT_POP_SHOWN_KEY) !== '1') {
+        toast.classList.remove('map-toast--pop');
+        // Force reflow so the animation reliably restarts.
+        void toast.offsetWidth;
+        toast.classList.add('map-toast--pop');
+        sessionStorage.setItem(MAP_HINT_POP_SHOWN_KEY, '1');
+    }
 }
 
 function hideMapHintToast() {
@@ -60,6 +71,12 @@ function hideMapHintToast() {
 function wireMapHintToast() {
     const { toast, close } = getHintToastEls();
     if (!toast || !close) return;
+
+    toast.addEventListener('animationend', (e) => {
+        if (e.animationName === 'mapToastPop') {
+            toast.classList.remove('map-toast--pop');
+        }
+    });
 
     close.addEventListener('click', (e) => {
         e.preventDefault();

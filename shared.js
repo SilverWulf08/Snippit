@@ -1,6 +1,7 @@
 // Shared helpers used across pages (home + game).
 
 const MAP_HINT_DISMISSED_KEY = 'snippit.mapHintDismissed';
+const MAP_HINT_POP_SHOWN_KEY = 'snippit.mapHintPopShown';
 
 function getNavigationType() {
     try {
@@ -26,5 +27,6 @@ function clearMapHintOnReload() {
     // sessionStorage survives reload, so we explicitly clear the dismissal flag on reload.
     if (getNavigationType() === 'reload') {
         sessionStorage.removeItem(MAP_HINT_DISMISSED_KEY);
+        sessionStorage.removeItem(MAP_HINT_POP_SHOWN_KEY);
     }
 }
