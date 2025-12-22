@@ -42,11 +42,82 @@ let pendingMode = null;
 const QUESTIONS_USE_POINTS_KEY = 'snippit.questionsUsePoints';
 const QUESTIONS_DIFFICULTY_KEY = 'snippit.questionsDifficulty';
 
+function getPointsDifficultyExplanationText() {
+    return (
+        'Points are based on distance (closer = more points) and a speed bonus.\n' +
+        'If time runs out, the round ends with 0 points and auto-advances.\n\n' +
+        'Normal: 2:00 per round. Speed bonus: 2x (under 30s), 1.5x (under 60s).\n' +
+        'Challenging: 1:00 per round. Reduced distance points. Speed bonus: 1.5x (under 30s).\n' +
+        'Hard: 0:30 per round. Very tough distance points. Speed bonus: 2x (under 10s).\n' +
+        'Expert: same as Hard, but if you guess more than 1000 km away even once, it is Game Over.'
+    );
+}
+
+function getQuestionsDifficultyExplanationText() {
+    return (
+        'Classic: keep playing at your own pace.\n\n' +
+        'Points: 10 rounds, reach 1000 points. You score based on distance (closer = more points) plus a speed bonus.\n' +
+        'If time runs out, the round ends with 0 points.\n\n' +
+        'Normal: 2:00 per round. Speed bonus: 2x (under 30s), 1.5x (under 60s).\n' +
+        'Challenging: 1:00 per round. Reduced distance points. Speed bonus: 1.5x (under 30s).\n' +
+        'Hard: 0:30 per round. Very tough distance points. Speed bonus: 2x (under 10s).\n' +
+        'Expert: same as Hard, but if you guess more than 1000 km away even once, it is Game Over.'
+    );
+}
+
+function setModeIntroMoreOverlayVisible(visible) {
+    const overlay = document.getElementById('modeIntroMoreOverlay');
+    if (!overlay) return;
+
+    // Important: allow CSS transitions to run by not toggling display+class in the same frame.
+    if (visible) {
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(() => {
+            overlay.classList.add('is-visible');
+        });
+        return;
+    }
+
+    overlay.classList.remove('is-visible');
+    overlay.setAttribute('aria-hidden', 'true');
+
+    // Wait for fade-out before removing from layout.
+    window.setTimeout(() => {
+        if (!overlay.classList.contains('is-visible')) {
+            overlay.style.display = 'none';
+        }
+    }, 220);
+}
+
+function setModeIntroMoreOverlayContent(titleText, bodyText) {
+    const title = document.getElementById('modeIntroMoreTitle');
+    const body = document.getElementById('modeIntroMoreBody');
+    if (title) title.textContent = titleText;
+    if (body) body.textContent = bodyText;
+}
+
 function setModeIntroVisible(visible) {
     const intro = document.getElementById('modeIntro');
     if (!intro) return;
     intro.classList.toggle('is-visible', visible);
     intro.setAttribute('aria-hidden', visible ? 'false' : 'true');
+
+    if (!visible) {
+        setModeIntroMoreOverlayVisible(false);
+    }
+}
+
+function getCheckedRadioValue(name) {
+    const selected = document.querySelector(`input[type="radio"][name="${name}"]:checked`);
+    return selected ? selected.value : '';
+}
+
+function setCheckedRadioValue(name, value) {
+    const input = document.querySelector(`input[type="radio"][name="${name}"][value="${value}"]`);
+    if (!input) return;
+    input.checked = true;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function showModeIntro(mode) {
@@ -55,6 +126,7 @@ function showModeIntro(mode) {
     const intro = document.getElementById('modeIntro');
     const title = document.getElementById('modeIntroTitle');
     const desc = document.getElementById('modeIntroDescription');
+    const moreBtn = document.getElementById('modeIntroMoreBtn');
     const diff = document.getElementById('modeIntroPointsDifficulty');
     const qScoring = document.getElementById('modeIntroQuestionsScoring');
     const qDiff = document.getElementById('modeIntroQuestionsDifficulty');
@@ -73,6 +145,7 @@ function showModeIntro(mode) {
     if (mode === 'endless') {
         title.textContent = 'Classic mode';
         desc.textContent = 'Play as many rounds of Snippit as you like trying to guess the location on the map. After each guess you\'ll see how far off you were, so you can keep improving your world knowledge.';
+        if (moreBtn) moreBtn.style.display = 'none';
         diff.style.display = 'none';
         if (qScoring) qScoring.style.display = 'none';
     } else if (mode === 'questions') {
@@ -80,12 +153,12 @@ function showModeIntro(mode) {
         desc.textContent =
             'Answer short prompts by guessing the correct spot on the world map.\n\n' +
             'Expect questions about places, famous people, historic events, landmarks, and food — enough variety to keep it surprising.\n\n' +
-            'Classic way: keep playing at your own pace.\n' +
-            'With Points: 10 rounds, reach 1000 points. You score based on distance (closer = more points) plus a speed bonus. If time runs out, the round ends with 0 points.';
+            'Choose Classic or Points (see more...).';
+        if (moreBtn) moreBtn.style.display = 'inline-block';
         diff.style.display = 'none';
         if (qScoring) qScoring.style.display = 'block';
 
-        // Default state: Classic way (no points)
+        // Default state: Classic (no points)
         const classicRadio = document.querySelector('input[name="questionsScoring"][value="classic"]');
         if (classicRadio) classicRadio.checked = true;
         if (qDiff) qDiff.style.display = 'none';
@@ -96,11 +169,8 @@ function showModeIntro(mode) {
         title.textContent = 'Points mode';
         desc.textContent =
             'Play 10 rounds of Snippit and try to reach 1000 points.\n' +
-            'Points are based on distance (closer = more points) and a speed bonus.\n' +
-            'If time runs out, the round ends with 0 points and auto-advances.\n\n' +
-            'Normal: 2:00 per round. Speed bonus: 2x (under 30s), 1.5x (under 60s).\n' +
-            'Challenging: 1:00 per round. Reduced distance points. Speed bonus: 1.5x (under 30s).\n' +
-            'Hard: 0:30 per round. Very tough distance points. Speed bonus: 2x (under 10s).';
+            'Points are based on distance and speed. Choose a difficulty below (see more...).';
+        if (moreBtn) moreBtn.style.display = 'inline-block';
         diff.style.display = 'block';
         if (qScoring) qScoring.style.display = 'none';
     } else {
@@ -110,9 +180,10 @@ function showModeIntro(mode) {
             'Snippit is a quick geography guessing game.\n\n' +
             'You see a zoomed-in mini-map (the “snippit”) and you try to place your guess on the big world map.\n' +
             'After guessing you\'ll see the distance between your guess and the real location.\n\n' +
-            'Classic mode: keep playing and improve.\n' +
-            'Questions mode: answer questions based on the snippit.\n' +
-            'Points mode: 10 rounds, reach 1000 points — accuracy + speed matter.';
+            'Classic mode: classic Snippit, keep playing and improve.\n' +
+            'Questions mode: answer questions by guessing the location on the map.\n' +
+            'Points mode: 10 rounds of classic Snippit, reach 1000 points — accuracy + speed matter.';
+        if (moreBtn) moreBtn.style.display = 'none';
         diff.style.display = 'none';
         if (qScoring) qScoring.style.display = 'none';
 
@@ -197,6 +268,8 @@ function wireModeIntro() {
     const back = document.getElementById('modeIntroBack');
     const play = document.getElementById('modeIntroPlay');
     const qDiff = document.getElementById('modeIntroQuestionsDifficulty');
+    const moreBtn = document.getElementById('modeIntroMoreBtn');
+    const moreOverlay = document.getElementById('modeIntroMoreOverlay');
 
     const activate = (el, handler) => {
         if (!el) return;
@@ -211,6 +284,40 @@ function wireModeIntro() {
 
     activate(back, hideModeIntro);
     activate(play, startSelectedMode);
+
+    if (moreBtn) {
+        moreBtn.addEventListener('click', () => {
+            const modeIntro = document.getElementById('modeIntro');
+            const mode = modeIntro ? modeIntro.dataset.mode : '';
+            if (mode === 'points') {
+                setModeIntroMoreOverlayContent('Points mode info', getPointsDifficultyExplanationText());
+                setModeIntroMoreOverlayVisible(true);
+                return;
+            }
+
+            if (mode === 'questions') {
+                setModeIntroMoreOverlayContent('Questions mode info', getQuestionsDifficultyExplanationText());
+                setModeIntroMoreOverlayVisible(true);
+                return;
+            }
+        });
+    }
+
+    if (moreOverlay) {
+        moreOverlay.addEventListener('click', (e) => {
+            if (e.target === moreOverlay) {
+                setModeIntroMoreOverlayVisible(false);
+            }
+        });
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const overlay = document.getElementById('modeIntroMoreOverlay');
+        if (overlay && overlay.classList.contains('is-visible')) {
+            setModeIntroMoreOverlayVisible(false);
+        }
+    });
 
     if (qDiff) {
         const updateQuestionsDifficultyVisibility = () => {
@@ -267,7 +374,7 @@ function wireHomeTitleBarrelRoll() {
     if (!title || !inner) return;
 
     inner.addEventListener('animationend', (e) => {
-        if (e.animationName === 'homeTitleBarrelRoll') {
+        if (e.animationName === 'homeTitleTextFrontFlip') {
             inner.classList.remove('is-rolling');
         }
     });

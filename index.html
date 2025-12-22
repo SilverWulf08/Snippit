@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20251222_7" />
 </head>
 <body>
     <!-- Initial page-load spinner (solid black background + white compass, fades out) -->
@@ -52,6 +52,7 @@
 
             <div id="modeIntroTitle" class="mode-intro__title"></div>
             <div id="modeIntroDescription" class="mode-intro__description"></div>
+            <button id="modeIntroMoreBtn" class="mode-intro__more" type="button" style="display:none;">more...</button>
 
             <div id="modeIntroPointsDifficulty" class="mode-intro__difficulty" style="display:none;" aria-label="Points difficulty">
                 <div class="mode-intro__difficulty-title">Difficulty</div>
@@ -68,6 +69,10 @@
                         <input type="radio" name="pointsDifficulty" value="hard" />
                         <span>Hard</span>
                     </label>
+                    <label class="mode-chip">
+                        <input type="radio" name="pointsDifficulty" value="expert" />
+                        <span>Expert</span>
+                    </label>
                 </div>
             </div>
 
@@ -76,11 +81,11 @@
                 <div class="mode-intro__difficulty-options" role="radiogroup" aria-label="Select play style">
                     <label class="mode-chip">
                         <input type="radio" name="questionsScoring" value="classic" checked />
-                        <span>Classic way</span>
+                        <span>Classic</span>
                     </label>
                     <label class="mode-chip">
                         <input type="radio" name="questionsScoring" value="points" />
-                        <span>With Points</span>
+                        <span>Points</span>
                     </label>
                 </div>
 
@@ -99,15 +104,27 @@
                             <input type="radio" name="questionsDifficulty" value="hard" />
                             <span>Hard</span>
                         </label>
+                        <label class="mode-chip">
+                            <input type="radio" name="questionsDifficulty" value="expert" />
+                            <span>Expert</span>
+                        </label>
                     </div>
                 </div>
             </div>
 
             <button id="modeIntroPlay" class="mode-intro__play" type="button">Play</button>
         </div>
+
+        <!-- "More..." popup for difficulty explanations (click outside to close) -->
+        <div id="modeIntroMoreOverlay" class="mode-intro-more" aria-hidden="true" style="display:none;">
+            <div class="mode-intro-more__card" role="dialog" aria-modal="true" aria-labelledby="modeIntroMoreTitle">
+                <div id="modeIntroMoreTitle" class="mode-intro-more__title"></div>
+                <div id="modeIntroMoreBody" class="mode-intro-more__body"></div>
+            </div>
+        </div>
     </div>
 
-    <script src="shared.js"></script>
-    <script src="home.js"></script>
+    <script src="shared.js?v=20251222_2"></script>
+    <script src="home.js?v=20251222_3"></script>
 </body>
 </html>

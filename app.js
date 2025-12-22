@@ -94,6 +94,7 @@ function wireMapHintToast() {
 function getPointsDifficulty() {
     const key = (isQuestionsMode() && isQuestionsPointsMode()) ? QUESTIONS_DIFFICULTY_KEY : 'snippit.pointsDifficulty';
     const v = sessionStorage.getItem(key);
+    if (v === 'expert') return 'expert';
     if (v === 'hard') return 'hard';
     if (v === 'challenging') return 'challenging';
     return 'normal';
@@ -101,12 +102,24 @@ function getPointsDifficulty() {
 
 function getPointsRoundTimeLimitMs() {
     const diff = getPointsDifficulty();
-    if (diff === 'hard') return 30 * 1000;
+    if (diff === 'hard' || diff === 'expert') return 30 * 1000;
     if (diff === 'challenging') return 1 * 60 * 1000;
     return 2 * 60 * 1000;
 }
 
+function formatDifficultyLabel(difficulty) {
+    if (difficulty === 'expert') return 'Expert';
+    if (difficulty === 'hard') return 'Hard';
+    if (difficulty === 'challenging') return 'Challenging';
+    return 'Normal';
+}
+
 let pointsState = null;
+
+let confettiRafId = null;
+let confettiActive = false;
+let confettiContinuous = false;
+let confettiPieces = [];
 
 // Splitter sizing (desktop/tablet)
 const MIN_PANORAMA_WIDTH_PX = 280;
@@ -128,6 +141,86 @@ let lastPickedQuestionAnswer = '';
 
 let currentQuestionText = '';
 let currentQuestionFact = '';
+
+// Persist decks across page navigation (Home -> game -> Home -> game) within the same tab.
+// Storage keys are defined in shared.js and cleared only on reload.
+
+function safeJsonParse(value) {
+    if (!value) return null;
+    try {
+        return JSON.parse(value);
+    } catch {
+        return null;
+    }
+}
+
+function isValidIndexArray(arr, maxLen) {
+    if (!Array.isArray(arr)) return false;
+    for (const v of arr) {
+        if (!Number.isInteger(v)) return false;
+        if (v < 0 || v >= maxLen) return false;
+    }
+    return true;
+}
+
+function restoreDeckState() {
+    // Locations deck
+    if (typeof sessionStorage !== 'undefined' && typeof locations !== 'undefined' && Array.isArray(locations) && locations.length > 0) {
+        const meta = safeJsonParse(sessionStorage.getItem(LOCATION_DECK_META_KEY));
+        const deck = safeJsonParse(sessionStorage.getItem(LOCATION_DECK_KEY));
+
+        if (meta && meta.len === locations.length && isValidIndexArray(deck, locations.length)) {
+            locationDeck = deck;
+            lastPickedLocationIndex = (Number.isInteger(meta.lastIndex) ? meta.lastIndex : null);
+            lastPickedLocationName = (typeof meta.lastName === 'string' ? meta.lastName : '');
+        }
+    }
+
+    // Questions deck
+    if (typeof sessionStorage !== 'undefined' && typeof questions !== 'undefined' && Array.isArray(questions) && questions.length > 0) {
+        const meta = safeJsonParse(sessionStorage.getItem(QUESTION_DECK_META_KEY));
+        const deck = safeJsonParse(sessionStorage.getItem(QUESTION_DECK_KEY));
+
+        if (meta && meta.len === questions.length && isValidIndexArray(deck, questions.length)) {
+            questionDeck = deck;
+            lastPickedQuestionIndex = (Number.isInteger(meta.lastIndex) ? meta.lastIndex : null);
+            lastPickedQuestionAnswer = (typeof meta.lastAnswer === 'string' ? meta.lastAnswer : '');
+        }
+    }
+}
+
+function persistLocationDeckState() {
+    try {
+        if (typeof sessionStorage === 'undefined') return;
+        if (!Array.isArray(locations) || locations.length === 0) return;
+        sessionStorage.setItem(LOCATION_DECK_KEY, JSON.stringify(locationDeck));
+        sessionStorage.setItem(LOCATION_DECK_META_KEY, JSON.stringify({
+            len: locations.length,
+            lastIndex: lastPickedLocationIndex,
+            lastName: lastPickedLocationName
+        }));
+    } catch {
+        // Ignore storage errors (e.g., quota or blocked storage)
+    }
+}
+
+function persistQuestionDeckState() {
+    try {
+        if (typeof sessionStorage === 'undefined') return;
+        if (typeof questions === 'undefined' || !Array.isArray(questions) || questions.length === 0) return;
+        sessionStorage.setItem(QUESTION_DECK_KEY, JSON.stringify(questionDeck));
+        sessionStorage.setItem(QUESTION_DECK_META_KEY, JSON.stringify({
+            len: questions.length,
+            lastIndex: lastPickedQuestionIndex,
+            lastAnswer: lastPickedQuestionAnswer
+        }));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+// Restore persisted deck state as early as possible (after datasets are loaded).
+restoreDeckState();
 
 function shuffleInPlace(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -167,6 +260,8 @@ function refillLocationDeck() {
             }
         }
     }
+
+    persistLocationDeckState();
 }
 
 function pickNextLocation() {
@@ -200,6 +295,8 @@ function pickNextLocation() {
 
     lastPickedLocationIndex = index;
     lastPickedLocationName = locations[index] ? locations[index].name : '';
+
+    persistLocationDeckState();
     return locations[index];
 }
 
@@ -231,6 +328,8 @@ function refillQuestionDeck() {
             }
         }
     }
+
+    persistQuestionDeckState();
 }
 
 function pickNextQuestion() {
@@ -263,6 +362,8 @@ function pickNextQuestion() {
 
     lastPickedQuestionIndex = index;
     lastPickedQuestionAnswer = questions[index] ? questions[index].answer : '';
+
+    persistQuestionDeckState();
     return questions[index];
 }
 
@@ -313,7 +414,7 @@ function initGameIfNeeded() {
     clearMapHintOnReload();
     wireMapHintToast();
 
-    // Questions mode can optionally run with Points scoring; drive UI visibility via a class.
+    // Questions mode can optionally run with points scoring; drive UI visibility via a class.
     if (document.body) {
         document.body.classList.toggle('is-points-scoring', isPointsScoringMode());
     }
@@ -369,6 +470,8 @@ function ensurePointsState() {
     pointsState = {
         difficulty: getPointsDifficulty(),
         timeLimitMs: getPointsRoundTimeLimitMs(),
+        gameEnded: false,
+        gameOver: false,
         round: 0,
         totalPoints: 0,
         totalTimeMs: 0,
@@ -384,6 +487,8 @@ function resetPointsState() {
     pointsState = {
         difficulty: getPointsDifficulty(),
         timeLimitMs: getPointsRoundTimeLimitMs(),
+        gameEnded: false,
+        gameOver: false,
         round: 0,
         totalPoints: 0,
         totalTimeMs: 0,
@@ -435,7 +540,7 @@ function startPointsRoundTimer() {
 }
 
 function getBasePointsForDistanceKm(distanceKm, difficulty) {
-    if (difficulty === 'hard') {
+    if (difficulty === 'hard' || difficulty === 'expert') {
         // Intentionally harsh: reaching 1000 in 10 rounds is difficult but possible with consistent close guesses.
         if (distanceKm < 2) return 200;
         if (distanceKm < 10) return 150;
@@ -465,7 +570,7 @@ function getBasePointsForDistanceKm(distanceKm, difficulty) {
 }
 
 function getSpeedMultiplierForElapsedMs(elapsedMs, difficulty) {
-    if (difficulty === 'hard') {
+    if (difficulty === 'hard' || difficulty === 'expert') {
         return elapsedMs < 10 * 1000 ? 2 : 1;
     }
 
@@ -483,22 +588,36 @@ function showPointsSummaryOverlay() {
     const overlay = document.getElementById('pointsSummaryOverlay');
     if (!overlay) return;
 
-    const titleEl = document.getElementById('pointsSummaryTitle');
-    if (titleEl) {
-        titleEl.textContent = isQuestionsMode() ? 'Questions (Points)' : 'Points Mode';
-    }
-
-    const scoreEl = document.getElementById('pointsSummaryScore');
-    const goalEl = document.getElementById('pointsSummaryGoal');
-    const roundsEl = document.getElementById('pointsSummaryRounds');
-    const timeEl = document.getElementById('pointsSummaryTime');
+    const crownEl = document.getElementById('pointsSummaryCrown');
 
     const totalPoints = pointsState ? pointsState.totalPoints : 0;
     const totalTimeMs = pointsState ? pointsState.totalTimeMs : 0;
     const success = totalPoints >= POINTS_GOAL_TOTAL;
+    const gameOver = !!(pointsState && pointsState.gameOver);
+
+    const titleEl = document.getElementById('pointsSummaryTitle');
+    if (titleEl) {
+        titleEl.textContent = gameOver
+            ? 'Game Over'
+            : (isQuestionsMode() ? 'Questions (Points)' : 'Points Mode');
+    }
+
+    const scoreEl = document.getElementById('pointsSummaryScore');
+    const goalEl = document.getElementById('pointsSummaryGoal');
+    const difficultyEl = document.getElementById('pointsSummaryDifficulty');
+    const roundsEl = document.getElementById('pointsSummaryRounds');
+    const timeEl = document.getElementById('pointsSummaryTime');
 
     if (scoreEl) scoreEl.textContent = `${totalPoints} pts`;
-    if (goalEl) goalEl.textContent = success ? `Goal reached (≥ ${POINTS_GOAL_TOTAL})` : `Goal not reached (${POINTS_GOAL_TOTAL} needed)`;
+    if (goalEl) {
+        goalEl.textContent = gameOver
+            ? 'Game over (a guess was over 1000 km away)'
+            : (success ? `Goal reached (≥ ${POINTS_GOAL_TOTAL})` : `Goal not reached (${POINTS_GOAL_TOTAL} needed)`);
+    }
+    if (difficultyEl) {
+        const difficulty = pointsState ? pointsState.difficulty : getPointsDifficulty();
+        difficultyEl.textContent = `Difficulty: ${formatDifficultyLabel(difficulty)}`;
+    }
     if (roundsEl) {
         if (success && pointsState) {
             roundsEl.textContent = `Completed in: ${pointsState.round}/${POINTS_ROUNDS_TOTAL} rounds`;
@@ -512,8 +631,19 @@ function showPointsSummaryOverlay() {
     overlay.style.display = 'flex';
     overlay.setAttribute('aria-hidden', 'false');
 
+    if (crownEl) {
+        crownEl.style.display = success ? 'block' : 'none';
+        crownEl.classList.toggle('is-expert', !!(success && pointsState && pointsState.difficulty === 'expert'));
+    }
+
     if (success) {
-        launchConfetti();
+        const isExpertSuccess = !!(pointsState && pointsState.difficulty === 'expert');
+        if (isExpertSuccess) {
+            launchConfetti({ continuous: true, colors: ['#f5c938'] });
+        } else {
+            // Default celebration (non-expert): keep it non-gold.
+            launchConfetti({ continuous: false, colors: ['#4CAF50', '#ffffff'] });
+        }
     }
 }
 
@@ -522,18 +652,37 @@ function hidePointsSummaryOverlay() {
     if (!overlay) return;
     overlay.style.display = 'none';
     overlay.setAttribute('aria-hidden', 'true');
+
+    stopConfetti();
 }
 
 function wirePointsSummaryActions() {
     if (!isPointsScoringMode()) return;
 
+    const backBtn = document.getElementById('pointsBackBtn');
     const retryBtn = document.getElementById('pointsRetryBtn');
     const homeBtn = document.getElementById('pointsHomeBtn');
+
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            hidePointsSummaryOverlay();
+
+            const nextBtn = document.getElementById('nextBtn');
+            if (nextBtn) {
+                nextBtn.textContent = 'Show summary';
+                nextBtn.style.display = 'block';
+            }
+        });
+    }
 
     if (retryBtn) {
         retryBtn.addEventListener('click', () => {
             hidePointsSummaryOverlay();
             resetPointsState();
+
+            const nextBtn = document.getElementById('nextBtn');
+            if (nextBtn) nextBtn.textContent = 'Next Round';
+
             showInitialSpinner();
             setTimeout(() => {
                 initGameIfNeeded();
@@ -549,10 +698,13 @@ function wirePointsSummaryActions() {
     }
 }
 
-function endPointsGame() {
+function endPointsGame(options = {}) {
     if (!pointsState) return;
+    const { gameOver = false } = options;
     stopPointsRoundTimer();
     pointsState.roundEnded = true;
+    pointsState.gameEnded = true;
+    pointsState.gameOver = !!gameOver;
 
     // Hide in-game controls so the summary is the focus.
     const guessBtn = document.getElementById('guessBtn');
@@ -587,7 +739,24 @@ function onPointsRoundTimeout() {
     }, 500);
 }
 
-function launchConfetti() {
+function stopConfetti() {
+    confettiActive = false;
+    confettiContinuous = false;
+    confettiPieces = [];
+    if (confettiRafId !== null) {
+        cancelAnimationFrame(confettiRafId);
+        confettiRafId = null;
+    }
+
+    const canvas = document.getElementById('confettiCanvas');
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    if (canvas && ctx) {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+}
+
+function launchConfetti(options = {}) {
+    const { continuous = false, color = '#f5c938', colors = null } = options;
     const canvas = document.getElementById('confettiCanvas');
     if (!canvas) return;
 
@@ -605,39 +774,64 @@ function launchConfetti() {
 
     resize();
 
-    const colors = ['#4CAF50', '#FFD700', '#ffffff'];
-    const pieces = Array.from({ length: 140 }, () => {
-        const x = Math.random() * window.innerWidth;
-        const y = -20 - Math.random() * 200;
-        const size = 6 + Math.random() * 8;
-        const speedY = 2 + Math.random() * 5;
-        const speedX = -2 + Math.random() * 4;
-        const rotation = Math.random() * Math.PI;
-        const rotationSpeed = (-0.15 + Math.random() * 0.3);
+    stopConfetti();
+    confettiActive = true;
+    confettiContinuous = !!continuous;
+
+    const palette = (Array.isArray(colors) && colors.length > 0) ? colors : [color];
+    const pickColor = () => palette[Math.floor(Math.random() * palette.length)];
+
+    const makePiece = (spawnY) => {
+        const w = window.innerWidth;
         return {
-            x,
-            y,
-            size,
-            speedX,
-            speedY,
-            rotation,
-            rotationSpeed,
-            color: colors[Math.floor(Math.random() * colors.length)]
+            x: Math.random() * w,
+            y: spawnY,
+            size: 6 + Math.random() * 8,
+            speedX: -1.5 + Math.random() * 3,
+            speedY: 2.5 + Math.random() * 6,
+            rotation: Math.random() * Math.PI,
+            rotationSpeed: (-0.15 + Math.random() * 0.3),
+            color: pickColor()
         };
+    };
+
+    const initialCount = confettiContinuous ? 140 : 160;
+
+    // For continuous mode, seed pieces across the whole screen height so it starts immediately.
+    // For burst mode, keep them above the screen.
+    confettiPieces = Array.from({ length: initialCount }, () => {
+        const spawnY = confettiContinuous
+            ? (-window.innerHeight + Math.random() * (window.innerHeight * 2))
+            : (-20 - Math.random() * 220);
+        return makePiece(spawnY);
     });
 
     const start = performance.now();
-    const duration = 2600;
+    const duration = confettiContinuous ? Infinity : 2600;
 
     const frame = (now) => {
+        if (!confettiActive) return;
+
         const t = now - start;
         ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-        for (const p of pieces) {
+        for (const p of confettiPieces) {
             p.x += p.speedX;
             p.y += p.speedY;
             p.rotation += p.rotationSpeed;
             p.speedY += 0.03; // gravity
+
+            if (confettiContinuous && p.y > window.innerHeight + 40) {
+                const np = makePiece(-40 - Math.random() * (window.innerHeight * 0.35));
+                p.x = np.x;
+                p.y = np.y;
+                p.size = np.size;
+                p.speedX = np.speedX;
+                p.speedY = np.speedY;
+                p.rotation = np.rotation;
+                p.rotationSpeed = np.rotationSpeed;
+                p.color = np.color;
+            }
 
             ctx.save();
             ctx.translate(p.x, p.y);
@@ -648,13 +842,13 @@ function launchConfetti() {
         }
 
         if (t < duration) {
-            requestAnimationFrame(frame);
+            confettiRafId = requestAnimationFrame(frame);
         } else {
-            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            stopConfetti();
         }
     };
 
-    requestAnimationFrame(frame);
+    confettiRafId = requestAnimationFrame(frame);
 }
 
 function scheduleInvalidateSizes() {
@@ -1051,6 +1245,8 @@ function makeGuess() {
         actualLocation.lng
     );
 
+    const isExpertGameOver = isPointsScoringMode() && pointsState && pointsState.difficulty === 'expert' && distance > 1000;
+
     // Place actual location marker
     actualMarker = L.circleMarker([actualLocation.lat, actualLocation.lng], {
         radius: 10,
@@ -1132,29 +1328,41 @@ function makeGuess() {
         const multiplierText = multiplier === 1 ? '' : ` (x${multiplier})`;
         message = `${message} +${awarded} points${multiplierText}`;
 
-        // If the goal is reached, end immediately (timer already stopped above).
-        if (pointsState.totalPoints >= POINTS_GOAL_TOTAL) {
+        // Expert twist: a single guess over 1000 km ends the entire run.
+        if (isExpertGameOver) {
             const guessBtn = document.getElementById('guessBtn');
             const nextBtn = document.getElementById('nextBtn');
             if (guessBtn) guessBtn.style.display = 'none';
             if (nextBtn) nextBtn.style.display = 'none';
 
             setTimeout(() => {
-                endPointsGame();
+                endPointsGame({ gameOver: true });
             }, 250);
-        }
+        } else {
+            // If the goal is reached, end immediately (timer already stopped above).
+            if (pointsState.totalPoints >= POINTS_GOAL_TOTAL) {
+                const guessBtn = document.getElementById('guessBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                if (guessBtn) guessBtn.style.display = 'none';
+                if (nextBtn) nextBtn.style.display = 'none';
 
-        // If this was the last round, end the game after showing the result.
-        if (pointsState.round >= POINTS_ROUNDS_TOTAL) {
-            // Hide the next-round UI; the summary is shown on top.
-            const guessBtn = document.getElementById('guessBtn');
-            const nextBtn = document.getElementById('nextBtn');
-            if (guessBtn) guessBtn.style.display = 'none';
-            if (nextBtn) nextBtn.style.display = 'none';
+                setTimeout(() => {
+                    endPointsGame();
+                }, 250);
+            }
 
-            setTimeout(() => {
-                endPointsGame();
-            }, 250);
+            // If this was the last round, end the game after showing the result.
+            if (pointsState.round >= POINTS_ROUNDS_TOTAL) {
+                // Hide the next-round UI; the summary is shown on top.
+                const guessBtn = document.getElementById('guessBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                if (guessBtn) guessBtn.style.display = 'none';
+                if (nextBtn) nextBtn.style.display = 'none';
+
+                setTimeout(() => {
+                    endPointsGame();
+                }, 250);
+            }
         }
     }
 
@@ -1199,6 +1407,12 @@ if (guessBtn) guessBtn.addEventListener('click', makeGuess);
 
 const nextBtn = document.getElementById('nextBtn');
 if (nextBtn) nextBtn.addEventListener('click', () => {
+    if (isPointsScoringMode() && pointsState && pointsState.gameEnded) {
+        showPointsSummaryOverlay();
+        nextBtn.style.display = 'none';
+        return;
+    }
+
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
 
