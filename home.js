@@ -42,6 +42,79 @@ let pendingMode = null;
 const QUESTIONS_USE_POINTS_KEY = 'snippit.questionsUsePoints';
 const QUESTIONS_DIFFICULTY_KEY = 'snippit.questionsDifficulty';
 
+const PATCH_NOTES_URL = 'patch-notes.json?v=20251224_1';
+let patchNotesCache = null;
+
+async function loadPatchNotes() {
+    if (patchNotesCache) return patchNotesCache;
+    const res = await fetch(PATCH_NOTES_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to load patch notes: ${res.status}`);
+    const data = await res.json();
+    patchNotesCache = data;
+    return data;
+}
+
+function renderPatchNotes(data) {
+    const introEl = document.getElementById('patchNotesIntro');
+    const listEl = document.getElementById('patchNotesList');
+    if (!introEl || !listEl) return;
+
+    introEl.textContent = (data && typeof data.intro === 'string') ? data.intro : '';
+    listEl.innerHTML = '';
+
+    const versions = (data && Array.isArray(data.versions)) ? data.versions : [];
+    for (const v of versions) {
+        const versionText = (v && typeof v.version === 'string') ? v.version : 'Unknown';
+        const dateText = (v && typeof v.date === 'string') ? v.date : '';
+        const notes = (v && Array.isArray(v.notes)) ? v.notes : [];
+
+        const section = document.createElement('section');
+        section.className = 'patch-notes__version';
+
+        const title = document.createElement('div');
+        title.className = 'patch-notes__version-title';
+        title.textContent = `Version ${versionText}`;
+        section.appendChild(title);
+
+        if (dateText) {
+            const meta = document.createElement('div');
+            meta.className = 'patch-notes__version-meta';
+            meta.textContent = dateText;
+            section.appendChild(meta);
+        }
+
+        if (notes.length > 0) {
+            const ul = document.createElement('ul');
+            ul.className = 'patch-notes__items';
+            for (const item of notes) {
+                const li = document.createElement('li');
+                li.textContent = String(item);
+                ul.appendChild(li);
+            }
+            section.appendChild(ul);
+        }
+
+        listEl.appendChild(section);
+    }
+}
+
+function setPatchNotesLoading(loading) {
+    const introEl = document.getElementById('patchNotesIntro');
+    const listEl = document.getElementById('patchNotesList');
+    if (!introEl || !listEl) return;
+    if (!loading) return;
+    introEl.textContent = 'Loading patch notes…';
+    listEl.innerHTML = '';
+}
+
+function setPatchNotesError(message) {
+    const introEl = document.getElementById('patchNotesIntro');
+    const listEl = document.getElementById('patchNotesList');
+    if (!introEl || !listEl) return;
+    introEl.textContent = message || 'Could not load patch notes.';
+    listEl.innerHTML = '';
+}
+
 function getPointsDifficultyExplanationText() {
     return (
         'Points are based on distance (closer = more points) and a speed bonus.\n' +
@@ -126,7 +199,12 @@ function showModeIntro(mode) {
     const intro = document.getElementById('modeIntro');
     const title = document.getElementById('modeIntroTitle');
     const desc = document.getElementById('modeIntroDescription');
+    const helpExtra = document.getElementById('modeIntroHelpExtra');
+    const helpModes = document.getElementById('modeIntroHelpModes');
+    const patchNotes = document.getElementById('modeIntroPatchNotes');
     const moreBtn = document.getElementById('modeIntroMoreBtn');
+    const moreParking = document.getElementById('modeIntroInfoParking');
+    const classicScoring = document.getElementById('modeIntroClassicScoring');
     const diff = document.getElementById('modeIntroPointsDifficulty');
     const qScoring = document.getElementById('modeIntroQuestionsScoring');
     const qDiff = document.getElementById('modeIntroQuestionsDifficulty');
@@ -142,19 +220,41 @@ function showModeIntro(mode) {
         play.textContent = 'Play';
     }
 
+    if (helpExtra) helpExtra.style.display = 'none';
+    if (patchNotes) patchNotes.style.display = 'none';
+
+    // Ensure the Points info button starts from a known place every time.
+    if (moreBtn && moreParking) {
+        moreParking.appendChild(moreBtn);
+    }
+
     if (mode === 'endless') {
         title.textContent = 'Classic mode';
-        desc.textContent = 'Play as many rounds of Snippit as you like trying to guess the location on the map. After each guess you\'ll see how far off you were, so you can keep improving your world knowledge.';
-        if (moreBtn) moreBtn.style.display = 'none';
-        diff.style.display = 'none';
+        desc.textContent =
+            'Play the classic Snippit experience.\n' +
+            'You\'ll see a zoomed-in mini-map (the “snippit”) and have to try and guess the correct spot by placing your guess on the big world map.\n\n' +
+            'Choose Classic or Points play style.';
+
+        if (classicScoring) classicScoring.style.display = 'block';
         if (qScoring) qScoring.style.display = 'none';
+
+        // Default state: Classic (no points)
+        const classicRadio = document.querySelector('input[name="classicScoring"][value="classic"]');
+        if (classicRadio) classicRadio.checked = true;
+
+        diff.style.display = 'none';
+        if (moreBtn) moreBtn.style.display = 'none';
+
+        const normalDiff = document.querySelector('input[name="pointsDifficulty"][value="normal"]');
+        if (normalDiff) normalDiff.checked = true;
     } else if (mode === 'questions') {
         title.textContent = 'Questions mode';
         desc.textContent =
             'Answer short prompts by guessing the correct spot on the world map.\n\n' +
             'Expect questions about places, famous people, historic events, landmarks, and food — enough variety to keep it surprising.\n\n' +
-            'Choose Classic or Points (see more...).';
-        if (moreBtn) moreBtn.style.display = 'inline-block';
+            'Choose Classic or Points play style.';
+        if (moreBtn) moreBtn.style.display = 'none';
+        if (classicScoring) classicScoring.style.display = 'none';
         diff.style.display = 'none';
         if (qScoring) qScoring.style.display = 'block';
 
@@ -166,30 +266,68 @@ function showModeIntro(mode) {
         const normalDiff = document.querySelector('input[name="questionsDifficulty"][value="normal"]');
         if (normalDiff) normalDiff.checked = true;
     } else if (mode === 'points') {
-        title.textContent = 'Points mode';
-        desc.textContent =
-            'Play 10 rounds of Snippit and try to reach 1000 points.\n' +
-            'Points are based on distance and speed. Choose a difficulty below (see more...).';
-        if (moreBtn) moreBtn.style.display = 'inline-block';
-        diff.style.display = 'block';
+        title.textContent = 'Reveal mode';
+        desc.textContent = 'Coming soon...';
+        if (moreBtn) moreBtn.style.display = 'none';
+        if (classicScoring) classicScoring.style.display = 'none';
+        diff.style.display = 'none';
         if (qScoring) qScoring.style.display = 'none';
-    } else {
+
+        // Placeholder: keep intro but prevent starting.
+        if (play) play.style.display = 'none';
+    } else if (mode === 'help') {
         // Help / about screen
         title.textContent = 'What is Snippit?';
+        // Keep the current first three lines from the old description.
         desc.textContent =
-            'Snippit is a quick geography guessing game.\n\n' +
+            'Snippit is a quick geography guessing game playable on both desktop and mobile devices in the browser.\n\n' +
             'You see a zoomed-in mini-map (the “snippit”) and you try to place your guess on the big world map.\n' +
-            'After guessing you\'ll see the distance between your guess and the real location.\n\n' +
-            'Classic mode: classic Snippit, keep playing and improve.\n' +
-            'Questions mode: answer questions by guessing the location on the map.\n' +
-            'Points mode: 10 rounds of classic Snippit, reach 1000 points — accuracy + speed matter.';
+            'After guessing you\'ll see the distance between your guess and the real location.';
+
+        if (helpExtra) helpExtra.style.display = 'block';
+        if (helpModes) {
+            helpModes.textContent =
+                'Classic mode: Play the classic Snippit experience.\n' +
+                'Choose Classic or Points play style.\n\n' +
+                'Questions mode: Answer short prompts by guessing the correct spot on the world map.\n' +
+                'Choose Classic or Points play style.\n\n' +
+                'Reveal mode: Coming soon…';
+        }
+
         if (moreBtn) moreBtn.style.display = 'none';
+        if (classicScoring) classicScoring.style.display = 'none';
         diff.style.display = 'none';
         if (qScoring) qScoring.style.display = 'none';
 
         // Spec: big Back button instead of Play for this screen.
         if (back) back.style.display = 'none';
         if (play) play.textContent = 'Back';
+    } else if (mode === 'patchNotes') {
+        title.textContent = 'Patch Notes';
+        desc.textContent = '';
+
+        if (patchNotes) patchNotes.style.display = 'block';
+        setPatchNotesLoading(true);
+        loadPatchNotes()
+            .then((data) => renderPatchNotes(data))
+            .catch(() => setPatchNotesError('Could not load patch notes.'));
+
+        if (moreBtn) moreBtn.style.display = 'none';
+        if (classicScoring) classicScoring.style.display = 'none';
+        diff.style.display = 'none';
+        if (qScoring) qScoring.style.display = 'none';
+
+        // Use the same "big Back" behavior as the help screen.
+        if (back) back.style.display = 'none';
+        if (play) play.textContent = 'Back';
+    } else {
+        // Fallback
+        title.textContent = '';
+        desc.textContent = '';
+        if (moreBtn) moreBtn.style.display = 'none';
+        if (classicScoring) classicScoring.style.display = 'none';
+        diff.style.display = 'none';
+        if (qScoring) qScoring.style.display = 'none';
     }
 
     setModeIntroVisible(true);
@@ -220,10 +358,21 @@ function getSelectedQuestionsScoring() {
     return selected ? selected.value : 'classic';
 }
 
+function getSelectedClassicScoring() {
+    const selected = document.querySelector('input[name="classicScoring"]:checked');
+    return selected ? selected.value : 'classic';
+}
+
 function startSelectedMode() {
     if (!pendingMode) return;
 
-    if (pendingMode === 'help') {
+    if (pendingMode === 'help' || pendingMode === 'patchNotes') {
+        hideModeIntro();
+        return;
+    }
+
+    // Placeholder: points card is reserved for future game modes.
+    if (pendingMode === 'points') {
         hideModeIntro();
         return;
     }
@@ -231,6 +380,16 @@ function startSelectedMode() {
     showInitialSpinner();
 
     if (pendingMode === 'endless') {
+        const scoring = getSelectedClassicScoring();
+        if (scoring === 'points') {
+            sessionStorage.setItem('snippit.startMode', 'points');
+            sessionStorage.setItem('snippit.pointsDifficulty', getSelectedPointsDifficulty());
+            setTimeout(() => {
+                window.location.href = 'points.html';
+            }, 80);
+            return;
+        }
+
         sessionStorage.setItem('snippit.startMode', 'endless');
         setTimeout(() => {
             window.location.href = 'game.html';
@@ -256,20 +415,35 @@ function startSelectedMode() {
         return;
     }
 
-    // Points mode
-    sessionStorage.setItem('snippit.startMode', 'points');
-    sessionStorage.setItem('snippit.pointsDifficulty', getSelectedPointsDifficulty());
-    setTimeout(() => {
-        window.location.href = 'points.html';
-    }, 80);
+    // (Points mode is launched via Classic -> Classic with points)
 }
 
 function wireModeIntro() {
     const back = document.getElementById('modeIntroBack');
     const play = document.getElementById('modeIntroPlay');
     const qDiff = document.getElementById('modeIntroQuestionsDifficulty');
+    const pointsDiff = document.getElementById('modeIntroPointsDifficulty');
     const moreBtn = document.getElementById('modeIntroMoreBtn');
+    const moreParking = document.getElementById('modeIntroInfoParking');
+    const pointsInfoSlot = document.getElementById('modeIntroPointsInfoSlot');
+    const questionsInfoSlot = document.getElementById('modeIntroQuestionsInfoSlot');
     const moreOverlay = document.getElementById('modeIntroMoreOverlay');
+    const helpPointsInfoBtn = document.getElementById('modeIntroHelpPointsInfoBtn');
+
+    const parkMoreBtn = () => {
+        if (moreBtn && moreParking) {
+            moreParking.appendChild(moreBtn);
+        }
+    };
+
+    const placeMoreBtn = (slotEl) => {
+        if (!moreBtn) return;
+        if (!slotEl) {
+            parkMoreBtn();
+            return;
+        }
+        slotEl.appendChild(moreBtn);
+    };
 
     const activate = (el, handler) => {
         if (!el) return;
@@ -285,19 +459,29 @@ function wireModeIntro() {
     activate(back, hideModeIntro);
     activate(play, startSelectedMode);
 
+    if (helpPointsInfoBtn) {
+        helpPointsInfoBtn.addEventListener('click', () => {
+            setModeIntroMoreOverlayContent('Points info', getPointsDifficultyExplanationText());
+            setModeIntroMoreOverlayVisible(true);
+        });
+    }
+
     if (moreBtn) {
         moreBtn.addEventListener('click', () => {
             const modeIntro = document.getElementById('modeIntro');
             const mode = modeIntro ? modeIntro.dataset.mode : '';
-            if (mode === 'points') {
-                setModeIntroMoreOverlayContent('Points mode info', getPointsDifficultyExplanationText());
+            const showPointsInfo = () => {
+                setModeIntroMoreOverlayContent('Points info', getPointsDifficultyExplanationText());
                 setModeIntroMoreOverlayVisible(true);
+            };
+
+            if (mode === 'endless' && getSelectedClassicScoring() === 'points') {
+                showPointsInfo();
                 return;
             }
 
-            if (mode === 'questions') {
-                setModeIntroMoreOverlayContent('Questions mode info', getQuestionsDifficultyExplanationText());
-                setModeIntroMoreOverlayVisible(true);
+            if (mode === 'questions' && getSelectedQuestionsScoring() === 'points') {
+                showPointsInfo();
                 return;
             }
         });
@@ -323,6 +507,15 @@ function wireModeIntro() {
         const updateQuestionsDifficultyVisibility = () => {
             const v = getSelectedQuestionsScoring();
             qDiff.style.display = (v === 'points') ? 'block' : 'none';
+            if (moreBtn) {
+                moreBtn.style.display = (v === 'points') ? 'inline-block' : 'none';
+            }
+
+            if (v === 'points') {
+                placeMoreBtn(questionsInfoSlot);
+            } else {
+                parkMoreBtn();
+            }
         };
 
         document.addEventListener('change', (e) => {
@@ -335,6 +528,34 @@ function wireModeIntro() {
 
         updateQuestionsDifficultyVisibility();
     }
+
+    if (pointsDiff && moreBtn) {
+        const updateClassicPointsVisibility = () => {
+            const modeIntro = document.getElementById('modeIntro');
+            const mode = modeIntro ? modeIntro.dataset.mode : '';
+            if (mode !== 'endless') return;
+
+            const v = getSelectedClassicScoring();
+            pointsDiff.style.display = (v === 'points') ? 'block' : 'none';
+            moreBtn.style.display = (v === 'points') ? 'inline-block' : 'none';
+
+            if (v === 'points') {
+                placeMoreBtn(pointsInfoSlot);
+            } else {
+                parkMoreBtn();
+            }
+        };
+
+        document.addEventListener('change', (e) => {
+            const t = e.target;
+            if (!(t instanceof HTMLInputElement)) return;
+            if (t.name === 'classicScoring') {
+                updateClassicPointsVisibility();
+            }
+        });
+
+        updateClassicPointsVisibility();
+    }
 }
 
 function wireHomeButtons() {
@@ -342,6 +563,7 @@ function wireHomeButtons() {
     const points = document.getElementById('pointsMode');
     const questions = document.getElementById('questionsMode');
     const help = document.getElementById('homeHelpBtn');
+    const patchNotes = document.getElementById('homePatchNotesBtn');
 
     const activate = (el, handler) => {
         if (!el) return;
@@ -359,6 +581,7 @@ function wireHomeButtons() {
     activate(endless, () => showModeIntro('endless'));
     activate(points, () => showModeIntro('points'));
     activate(help, () => showModeIntro('help'));
+    activate(patchNotes, () => showModeIntro('patchNotes'));
 }
 
 function homeTitleRollOnce() {
@@ -409,32 +632,37 @@ function wireHomeCreditConfetti() {
     const colors = ['#4CAF50', '#FFD700', '#ffffff'];
     const particles = [];
     let animationRunning = false;
-    const DURATION_MS = 1100;
+    const PARTICLE_LIFE_MS = 1200;
+    const RAIN_EMIT_MS = 1000;
+    let rainUntil = 0;
 
-    const addBurst = () => {
-        resize();
-
-        const rect = pill.getBoundingClientRect();
-        const originX = rect.left + rect.width / 2;
-        const originY = rect.top;
-        const bornAt = performance.now();
-
-        const count = 36;
+    const spawnRainParticles = (now, count) => {
         for (let i = 0; i < count; i++) {
-            const angle = (-Math.PI / 2) + (-0.9 + Math.random() * 1.8);
-            const speed = 3.5 + Math.random() * 4.5;
+            const originX = Math.random() * window.innerWidth;
+            const originY = -12 - Math.random() * 40;
+            const speedY = 2.0 + Math.random() * 4.2;
+            const driftX = (-0.9 + Math.random() * 1.8);
             particles.push({
                 x: originX,
                 y: originY,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
+                vx: driftX,
+                vy: speedY,
                 size: 4 + Math.random() * 5,
                 rotation: Math.random() * Math.PI,
                 rotationSpeed: (-0.25 + Math.random() * 0.5),
                 color: colors[Math.floor(Math.random() * colors.length)],
-                bornAt
+                bornAt: now
             });
         }
+    };
+
+    const addRain = () => {
+        resize();
+        const bornAt = performance.now();
+
+        // Emit continuously for ~1 second so it feels like "rain".
+        rainUntil = Math.max(rainUntil, bornAt + RAIN_EMIT_MS);
+        spawnRainParticles(bornAt, 10);
 
         if (!animationRunning) {
             animationRunning = true;
@@ -445,19 +673,23 @@ function wireHomeCreditConfetti() {
     const frame = (now) => {
         ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
+        if (now < rainUntil) {
+            spawnRainParticles(now, 4);
+        }
+
         // Update + draw all particles, and keep only those still alive.
         let writeIndex = 0;
         for (let i = 0; i < particles.length; i++) {
             const p = particles[i];
             const age = now - p.bornAt;
-            if (age >= DURATION_MS) continue;
+            if (age >= PARTICLE_LIFE_MS) continue;
 
             p.x += p.vx;
             p.y += p.vy;
             p.rotation += p.rotationSpeed;
-            p.vy += 0.12; // gravity
+            p.vy += 0.14; // gravity
 
-            const alpha = Math.max(0, 1 - age / DURATION_MS);
+            const alpha = Math.max(0, 1 - age / PARTICLE_LIFE_MS);
 
             ctx.save();
             ctx.globalAlpha = alpha;
@@ -471,7 +703,7 @@ function wireHomeCreditConfetti() {
         }
         particles.length = writeIndex;
 
-        if (particles.length > 0) {
+        if (particles.length > 0 || now < rainUntil) {
             requestAnimationFrame(frame);
         } else {
             animationRunning = false;
@@ -479,7 +711,7 @@ function wireHomeCreditConfetti() {
         }
     };
 
-    const activate = () => addBurst();
+    const activate = () => addRain();
 
     pill.addEventListener('click', activate);
     pill.addEventListener('keydown', (e) => {
@@ -492,16 +724,52 @@ function wireHomeCreditConfetti() {
     window.addEventListener('resize', resize);
 }
 
+function updateHomeBottomBarScale() {
+    const bar = document.getElementById('homeBottomBar');
+    const pill = document.getElementById('homeCredit');
+    const actions = document.getElementById('homeBottomActions');
+    if (!bar || !pill || !actions) return;
+
+    // Measure at scale 1.
+    bar.style.setProperty('--home-bottom-scale', '1');
+
+    const GAP = 10;
+    const barRect = bar.getBoundingClientRect();
+    const pillRect = pill.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+
+    const required = pillRect.width + GAP + actionsRect.width;
+    const desired = (required > 0 && barRect.width > 0) ? (barRect.width / required) : 1;
+    const scale = Math.max(0.72, Math.min(1, desired));
+    bar.style.setProperty('--home-bottom-scale', String(scale));
+}
+
+function wireHomeBottomBarScale() {
+    let rafId = 0;
+    const schedule = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+            rafId = 0;
+            updateHomeBottomBarScale();
+        });
+    };
+
+    window.addEventListener('resize', schedule);
+    schedule();
+}
+
 window.addEventListener('load', () => {
     wireHomeButtons();
     wireModeIntro();
     wireHomeTitleBarrelRoll();
     wireHomeCreditConfetti();
+    wireHomeBottomBarScale();
 
     // Always show the loading sequence before presenting the home screen.
     showInitialSpinner();
     setTimeout(() => {
         showHomeScreen();
+        updateHomeBottomBarScale();
         // One automatic roll when the home screen first appears.
         // Uses the same logic as click-to-roll, so behavior stays consistent.
         requestAnimationFrame(homeTitleRollOnce);

@@ -69,6 +69,13 @@ body {
         var(--surface-2);
 }
 
+.mode-intro[data-mode="patchNotes"] {
+    background:
+    /* Match Classic styling */
+        linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
+        var(--surface-2);
+}
+
 .mode-intro[data-mode="points"] {
     /* Dark green with a diagonal black gradient overlay (no new accent color) */
     background:
@@ -95,9 +102,18 @@ body {
     backdrop-filter: blur(12px);
     box-shadow: var(--shadow);
     padding: 18px;
+    max-height: calc(100vh - 24px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .mode-intro__back {
+    align-self: flex-start;
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 36px;
     padding: 0 14px;
     border-radius: 999px;
@@ -136,6 +152,77 @@ body {
     white-space: pre-line;
 }
 
+.mode-intro__content {
+    min-height: 0;
+    overflow: auto;
+    padding-right: 2px;
+}
+
+.mode-intro__section-title {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+}
+
+.mode-intro__help-modes {
+    margin-top: 8px;
+    color: rgba(255, 255, 255, 0.88);
+    line-height: 1.45;
+    font-size: 14px;
+    white-space: pre-line;
+}
+
+.mode-intro__help-points {
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.88);
+    line-height: 1.45;
+    font-size: 14px;
+}
+
+.mode-intro__more--inline {
+    display: inline;
+}
+
+.mode-intro__patch-intro {
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.88);
+    line-height: 1.45;
+    font-size: 14px;
+    white-space: pre-line;
+}
+
+.mode-intro__patch-list {
+    margin-top: 12px;
+    padding-bottom: 6px;
+}
+
+.patch-notes__version {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.patch-notes__version-title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+}
+
+.patch-notes__version-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.70);
+}
+
+.patch-notes__items {
+    margin-top: 8px;
+    padding-left: 18px;
+    color: rgba(255, 255, 255, 0.88);
+    line-height: 1.45;
+    font-size: 14px;
+}
+
 .mode-intro__difficulty {
     margin-top: 16px;
 }
@@ -146,6 +233,28 @@ body {
     color: rgba(255, 255, 255, 0.92);
     letter-spacing: 0.2px;
     margin-bottom: 8px;
+}
+
+.mode-intro__difficulty-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.mode-intro__difficulty-title-row .mode-intro__difficulty-title {
+    margin-bottom: 0;
+}
+
+.mode-intro__difficulty-info-slot {
+    display: flex;
+    align-items: center;
+}
+
+.mode-intro__difficulty-title-row .mode-intro__more {
+    margin-top: 0;
 }
 
 .mode-intro__difficulty-options {
@@ -531,37 +640,64 @@ body {
     z-index: 1;
     background: transparent;
 }
+.home-bottom-bar {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    z-index: 5;
+    height: 46px;
+    pointer-events: auto;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    --home-bottom-scale: 1;
+}
+.home-bottom-bar__actions {
+    display: flex;
+    align-items: center;
+    gap: calc(8px * var(--home-bottom-scale));
+    flex: 0 0 auto;
+}
 
 .home-credit-pill {
-    position: absolute;
-    left: 50%;
-    bottom: 18px;
-    transform: translateX(-50%);
-    z-index: 4;
-    padding: 8px 14px;
+    position: relative;
+    z-index: 0;
+    height: calc(46px * var(--home-bottom-scale));
+    padding: 0 calc(14px * var(--home-bottom-scale));
     border-radius: 999px;
     background: rgba(36, 36, 36, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
     color: rgba(255, 255, 255, 0.85);
-    font-size: 12px;
+    font-size: calc(12px * var(--home-bottom-scale));
     font-weight: 600;
     letter-spacing: 0.2px;
     cursor: pointer;
     user-select: none;
+    display: inline-flex;
+    align-items: center;
+    max-width: calc(340px * var(--home-bottom-scale));
+    flex: 0 0 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: none;
+    transform-origin: left center;
     transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
     box-shadow: var(--shadow-sm);
 }
 
 /* Home screen: bottom-right help button */
 .home-help-button {
-    position: absolute;
-    right: 18px;
-    bottom: 18px;
-    z-index: 5;
+    position: relative;
+    z-index: 0;
 
-    width: 46px;
-    height: 46px;
+    width: calc(46px * var(--home-bottom-scale));
+    height: calc(46px * var(--home-bottom-scale));
     border-radius: 999px;
     padding: 0;
 
@@ -574,12 +710,63 @@ body {
     box-shadow: var(--shadow-sm);
 
     color: rgba(255, 255, 255, 0.92);
-    font-size: 20px;
+    font-size: calc(20px * var(--home-bottom-scale));
     font-weight: 800;
     line-height: 1;
     cursor: pointer;
 
     transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+/* Home screen: bottom-right patch notes button (next to help) */
+.home-patch-button {
+    position: relative;
+    z-index: 0;
+
+    width: calc(46px * var(--home-bottom-scale));
+    height: calc(46px * var(--home-bottom-scale));
+    border-radius: 999px;
+    padding: 0;
+
+    display: grid;
+    place-items: center;
+
+    background: rgba(36, 36, 36, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
+
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+
+    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+}
+
+.home-patch-icon {
+    width: calc(22px * var(--home-bottom-scale));
+    height: calc(22px * var(--home-bottom-scale));
+    object-fit: contain;
+    display: block;
+    filter: brightness(0) invert(1);
+}
+
+.home-patch-button:hover {
+    transform: translateY(-2px) scale(1.06);
+    filter: brightness(1.06);
+    box-shadow: var(--shadow);
+}
+
+.home-patch-button:active {
+    transform: translateY(0) scale(1.02);
+    box-shadow: var(--shadow-sm);
+}
+
+.home-patch-button:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline-offset: 3px;
 }
 
 .home-help-button:hover {
@@ -599,12 +786,14 @@ body {
 }
 
 .home-credit-pill:hover {
-    transform: translateX(-50%) scale(1.06);
+    transform: translateY(-2px) scale(1.06);
     filter: brightness(1.06);
+    box-shadow: var(--shadow);
 }
 
 .home-credit-pill:active {
-    transform: translateX(-50%) scale(1.02);
+    transform: translateY(0) scale(1.02);
+    box-shadow: var(--shadow-sm);
 }
 
 .home-credit-pill:focus-visible {
@@ -673,7 +862,7 @@ body {
 }
 
 .home-mode--red {
-    /* Points mode: same green as the Guess button */
+    /* Reveal mode: same green as the Guess button */
     background: #4CAF50;
 }
 
@@ -745,7 +934,9 @@ body {
        a game-like rounded frame (title sits above the frame; credit/help sit below). */
     .home-screen {
         overflow: hidden;
-        background: #000;
+        background:
+            linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
+            var(--surface-2);
     }
 
     .home-modes {
@@ -798,11 +989,7 @@ body {
         margin-top: -1px;
     }
 
-    .home-credit-pill {
-        bottom: calc(18px + env(safe-area-inset-bottom));
-    }
-
-    .home-help-button {
+    .home-bottom-bar {
         bottom: calc(18px + env(safe-area-inset-bottom));
     }
 

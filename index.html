@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20251222_7" />
+    <link rel="stylesheet" href="styles.css?v=20251224_3" />
 </head>
 <body>
     <!-- Initial page-load spinner (solid black background + white compass, fades out) -->
@@ -30,18 +30,25 @@
             </div>
             <div id="endlessMode" class="home-mode home-mode--blue" role="button" tabindex="0" aria-label="Classic mode">
                 <span class="home-mode__label">Classic mode</span>
-                <span class="home-mode__description">Play Classic Snippit by guessing the location on the map.</span>
+                <span class="home-mode__description">Play Classic Snippit by guessing the location of the zoomed-in map snippit.</span>
             </div>
-            <div id="pointsMode" class="home-mode home-mode--red" role="button" tabindex="0" aria-label="Points mode">
-                <span class="home-mode__label">Points mode</span>
-                <span class="home-mode__description">Score points for accuracy (and speed) across 10 rounds of Snippit.</span>
+            <div id="pointsMode" class="home-mode home-mode--red" role="button" tabindex="0" aria-label="Reveal mode">
+                <span class="home-mode__label">Reveal mode</span>
+                <span class="home-mode__description">Coming soon…</span>
             </div>
         </div>
 
-        <div id="homeCredit" class="home-credit-pill" role="button" tabindex="0" aria-label="Made by Jorik Roosjen">
-            Made by Jorik Roosjen
+        <div id="homeBottomBar" class="home-bottom-bar" aria-label="Home actions">
+            <div id="homeCredit" class="home-credit-pill" role="button" tabindex="0" aria-label="Made by Jorik Roosjen">
+                Made by Jorik Roosjen
+            </div>
+            <div id="homeBottomActions" class="home-bottom-bar__actions" aria-label="Home buttons">
+                <button id="homePatchNotesBtn" class="home-patch-button" type="button" aria-label="Patch notes">
+                    <img class="home-patch-icon" src="patch notes.png" alt="" aria-hidden="true" />
+                </button>
+                <button id="homeHelpBtn" class="home-help-button" type="button" aria-label="What is Snippit?">?</button>
+            </div>
         </div>
-        <button id="homeHelpBtn" class="home-help-button" type="button" aria-label="What is Snippit?">?</button>
         <canvas id="homeConfettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
     </div>
 
@@ -51,11 +58,46 @@
             <button id="modeIntroBack" class="mode-intro__back" type="button">Back</button>
 
             <div id="modeIntroTitle" class="mode-intro__title"></div>
-            <div id="modeIntroDescription" class="mode-intro__description"></div>
-            <button id="modeIntroMoreBtn" class="mode-intro__more" type="button" style="display:none;">more...</button>
+            <div id="modeIntroContent" class="mode-intro__content">
+                <div id="modeIntroDescription" class="mode-intro__description"></div>
+
+                <div id="modeIntroHelpExtra" class="mode-intro__help-extra" style="display:none;" aria-label="About Snippit">
+                    <div class="mode-intro__section-title">Modes</div>
+                    <div id="modeIntroHelpModes" class="mode-intro__help-modes"></div>
+                    <div class="mode-intro__help-points">
+                        For info on playing with points see
+                        <button id="modeIntroHelpPointsInfoBtn" class="mode-intro__more mode-intro__more--inline" type="button">Points info</button>.
+                    </div>
+                </div>
+
+                <div id="modeIntroPatchNotes" class="mode-intro__patch-notes" style="display:none;" aria-label="Patch notes">
+                    <div id="patchNotesIntro" class="mode-intro__patch-intro"></div>
+                    <div id="patchNotesList" class="mode-intro__patch-list" aria-label="Patch notes list"></div>
+                </div>
+
+                <div id="modeIntroInfoParking" style="display:none;">
+                    <button id="modeIntroMoreBtn" class="mode-intro__more" type="button" style="display:none;">Points info</button>
+                </div>
+
+            <div id="modeIntroClassicScoring" class="mode-intro__difficulty" style="display:none;" aria-label="Classic play style">
+                <div class="mode-intro__difficulty-title">Play style</div>
+                <div class="mode-intro__difficulty-options" role="radiogroup" aria-label="Select play style">
+                    <label class="mode-chip">
+                        <input type="radio" name="classicScoring" value="classic" checked />
+                        <span>Classic</span>
+                    </label>
+                    <label class="mode-chip">
+                        <input type="radio" name="classicScoring" value="points" />
+                        <span>Points</span>
+                    </label>
+                </div>
+            </div>
 
             <div id="modeIntroPointsDifficulty" class="mode-intro__difficulty" style="display:none;" aria-label="Points difficulty">
-                <div class="mode-intro__difficulty-title">Difficulty</div>
+                <div class="mode-intro__difficulty-title-row">
+                    <div class="mode-intro__difficulty-title">Difficulty</div>
+                    <div id="modeIntroPointsInfoSlot" class="mode-intro__difficulty-info-slot"></div>
+                </div>
                 <div class="mode-intro__difficulty-options" role="radiogroup" aria-label="Select difficulty">
                     <label class="mode-chip">
                         <input type="radio" name="pointsDifficulty" value="normal" checked />
@@ -90,7 +132,10 @@
                 </div>
 
                 <div id="modeIntroQuestionsDifficulty" class="mode-intro__difficulty-inner" style="display:none;" aria-label="Questions difficulty">
-                    <div class="mode-intro__difficulty-title">Difficulty</div>
+                    <div class="mode-intro__difficulty-title-row">
+                        <div class="mode-intro__difficulty-title">Difficulty</div>
+                        <div id="modeIntroQuestionsInfoSlot" class="mode-intro__difficulty-info-slot"></div>
+                    </div>
                     <div class="mode-intro__difficulty-options" role="radiogroup" aria-label="Select difficulty">
                         <label class="mode-chip">
                             <input type="radio" name="questionsDifficulty" value="normal" checked />
@@ -125,6 +170,6 @@
     </div>
 
     <script src="shared.js?v=20251222_2"></script>
-    <script src="home.js?v=20251222_3"></script>
+    <script src="home.js?v=20251224_4"></script>
 </body>
 </html>

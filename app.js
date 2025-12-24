@@ -35,6 +35,33 @@ const SNIPPIT_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const SNIPPIT_TILE_ATTRIBUTION = '© OpenStreetMap contributors';
 const SNIPPIT_TILE_SUBDOMAINS = 'abc';
 
+function isLowEndMobileDevice() {
+    // Keep this conservative to avoid surprising quality drops.
+    const smallScreen = window.matchMedia('(max-width: 768px)').matches;
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const saveData = !!(connection && connection.saveData);
+
+    const lowCores = typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency > 0
+        ? navigator.hardwareConcurrency <= 4
+        : false;
+    const lowMemory = typeof navigator.deviceMemory === 'number' && navigator.deviceMemory > 0
+        ? navigator.deviceMemory <= 4
+        : false;
+
+    // Only treat as low-end if it's a phone-like device AND we see a likely constraint.
+    return (smallScreen && coarsePointer) && (prefersReducedMotion || saveData || lowCores || lowMemory);
+}
+
+function getConfettiDevicePixelRatioCap() {
+    const raw = window.devicePixelRatio || 1;
+    // Confetti is a full-screen canvas; DPR is a major perf multiplier.
+    return isLowEndMobileDevice() ? Math.min(raw, 1.25) : Math.min(raw, 2);
+}
+
 function getHintToastEls() {
     return {
         toast: document.getElementById('hintToast'),
@@ -376,12 +403,15 @@ function initGameIfNeeded() {
         return;
     }
 
+    const lowEndMobile = isLowEndMobileDevice();
+
     // Initialize main Leaflet map with continuous world wrapping
     map = L.map('map', {
         center: [20, 0],
         zoom: 2,
         minZoom: 2,
         worldCopyJump: true,
+        preferCanvas: true,
         // Clamp vertical panning to the map edges while keeping horizontal panning effectively endless.
         // Leaflet's bounds apply to both axes, so we use a very wide longitude range.
         maxBounds: L.latLngBounds(
@@ -396,9 +426,10 @@ function initGameIfNeeded() {
         attribution: MAIN_TILE_ATTRIBUTION,
         subdomains: MAIN_TILE_SUBDOMAINS,
         maxZoom: 19,
-        detectRetina: true,
-        // Smoother zooming: keep more tiles around and avoid reloading while mid-zoom.
-        keepBuffer: 6,
+        // Retina tiles + large buffers can be expensive on mobile.
+        detectRetina: !lowEndMobile,
+        // Keep fewer tiles around on low-end mobile to reduce memory/GC pressure.
+        keepBuffer: lowEndMobile ? 2 : 6,
         updateWhenIdle: true,
         updateWhenZooming: false,
         reuseTiles: true
@@ -494,17 +525,24 @@ function resetPointsState() {
         totalTimeMs: 0,
         roundStartMs: 0,
         roundEnded: false,
+        lastTimerText: '',
         timerIntervalId: null
     };
 }
 
+let pointsTimerElCache = null;
+
 function getPointsTimerEl() {
-    return document.getElementById('pointsTimer');
+    if (pointsTimerElCache && document.contains(pointsTimerElCache)) return pointsTimerElCache;
+    pointsTimerElCache = document.getElementById('pointsTimer');
+    return pointsTimerElCache;
 }
 
 function setPointsTimerText(text) {
+    if (pointsState && pointsState.lastTimerText === text) return;
     const el = getPointsTimerEl();
     if (el) el.textContent = text;
+    if (pointsState) pointsState.lastTimerText = text;
 }
 
 function stopPointsRoundTimer() {
@@ -533,6 +571,7 @@ function startPointsRoundTimer() {
     if (!pointsState) return;
     stopPointsRoundTimer();
     pointsState.roundStartMs = Date.now();
+    pointsState.lastTimerText = '';
     setPointsTimerText(formatClockMs(pointsState.timeLimitMs));
 
     // Tick relatively frequently so it feels responsive.
@@ -599,7 +638,7 @@ function showPointsSummaryOverlay() {
     if (titleEl) {
         titleEl.textContent = gameOver
             ? 'Game Over'
-            : (isQuestionsMode() ? 'Questions (Points)' : 'Points Mode');
+            : (isQuestionsMode() ? 'Questions (Points)' : 'Classic (Points)');
     }
 
     const scoreEl = document.getElementById('pointsSummaryScore');
@@ -756,6 +795,8 @@ function stopConfetti() {
 }
 
 function launchConfetti(options = {}) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
     const { continuous = false, color = '#f5c938', colors = null } = options;
     const canvas = document.getElementById('confettiCanvas');
     if (!canvas) return;
@@ -764,7 +805,7 @@ function launchConfetti(options = {}) {
     if (!ctx) return;
 
     const resize = () => {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = getConfettiDevicePixelRatioCap();
         canvas.width = Math.floor(window.innerWidth * dpr);
         canvas.height = Math.floor(window.innerHeight * dpr);
         canvas.style.width = `${window.innerWidth}px`;
@@ -795,7 +836,10 @@ function launchConfetti(options = {}) {
         };
     };
 
-    const initialCount = confettiContinuous ? 140 : 160;
+    const lowEndMobile = isLowEndMobileDevice();
+    const initialCount = confettiContinuous
+        ? (lowEndMobile ? 70 : 140)
+        : (lowEndMobile ? 90 : 160);
 
     // For continuous mode, seed pieces across the whole screen height so it starts immediately.
     // For burst mode, keep them above the screen.
@@ -905,7 +949,13 @@ function initSplitter() {
     const mapEl = document.getElementById('map');
     if (!container || !splitter || !mapEl) return;
 
+    let resizeRaf = null;
+
     const syncForLayout = () => {
+        if (resizeRaf !== null) return;
+        resizeRaf = requestAnimationFrame(() => {
+            resizeRaf = null;
+
         if (isMobileStackedLayout()) {
             clearMapWidthOverride();
             return;
@@ -926,23 +976,30 @@ function initSplitter() {
         const currentWidth = mapEl.getBoundingClientRect().width || currentMapWidthPx;
         const nextWidth = clampMapWidthPx(currentWidth || DEFAULT_MAP_WIDTH_PX);
         applyMapWidthPx(nextWidth);
+        });
     };
 
     syncForLayout();
 
     let dragging = false;
 
+    let dragContainerRight = 0;
+    let dragSplitterW = 0;
+    let dragRaf = null;
+    let pendingClientX = 0;
+
     const onPointerMove = (e) => {
         if (!dragging || isMobileStackedLayout()) return;
 
-        const containerRect = container.getBoundingClientRect();
-        const splitterRect = splitter.getBoundingClientRect();
-        const splitterW = splitterRect.width;
-
-        // Pointer is on the splitter; treat its center as the boundary.
-        const proposedMapWidth = (containerRect.right - e.clientX) - splitterW / 2;
-        const clamped = clampMapWidthPx(proposedMapWidth);
-        applyMapWidthPx(clamped);
+        pendingClientX = e.clientX;
+        if (dragRaf !== null) return;
+        dragRaf = requestAnimationFrame(() => {
+            dragRaf = null;
+            // Pointer is on the splitter; treat its center as the boundary.
+            const proposedMapWidth = (dragContainerRight - pendingClientX) - dragSplitterW / 2;
+            const clamped = clampMapWidthPx(proposedMapWidth);
+            applyMapWidthPx(clamped);
+        });
     };
 
     const stopDrag = () => {
@@ -957,6 +1014,12 @@ function initSplitter() {
     splitter.addEventListener('pointerdown', (e) => {
         if (isMobileStackedLayout()) return;
         dragging = true;
+
+        const containerRect = container.getBoundingClientRect();
+        const splitterRect = splitter.getBoundingClientRect();
+        dragContainerRight = containerRect.right;
+        dragSplitterW = splitterRect.width;
+
         splitter.setPointerCapture(e.pointerId);
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
@@ -1024,6 +1087,8 @@ function createMiniMap(lat, lng) {
         delete container._leaflet_id;
     }
 
+    const lowEndMobile = isLowEndMobileDevice();
+
     // Create mini map showing zoomed-in view of the location
     miniMap = L.map(container, {
         center: [lat, lng],
@@ -1034,7 +1099,8 @@ function createMiniMap(lat, lng) {
         doubleClickZoom: false,
         boxZoom: false,
         keyboard: false,
-        touchZoom: false
+        touchZoom: false,
+        preferCanvas: true
     });
 
     // Snippit tiles (OSM Standard)
@@ -1042,8 +1108,8 @@ function createMiniMap(lat, lng) {
         attribution: SNIPPIT_TILE_ATTRIBUTION,
         subdomains: SNIPPIT_TILE_SUBDOMAINS,
         maxZoom: 19,
-        detectRetina: true,
-        keepBuffer: 6,
+        detectRetina: !lowEndMobile,
+        keepBuffer: lowEndMobile ? 2 : 6,
         updateWhenIdle: true,
         updateWhenZooming: false,
         reuseTiles: true
