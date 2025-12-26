@@ -2,6 +2,18 @@
   "intro": "Patch notes for Snippit. Latest changes are at the top. (these patch notes and versions start at the release of the patch notes system)",
   "versions": [
     {
+      "version": "0.1.0",
+      "date": "2025-12-26",
+      "notes": [
+        "Home screen: replaced the mode buttons layout with a swipeable/clickable card deck.",
+        "Home screen: clicking side cards now brings them to the front; clicking the front card opens the mode intro.",
+        "Home screen: improved responsiveness so the deck switches to a vertical stack earlier to prevent off-screen cards.",
+        "Home screen: added vertical swipe (up/down) support when the deck is in vertical layout.",
+        "Home screen: tightened vertical layout sizing/spread on short screens to avoid overlapping the title or bottom bar.",
+        "Home screen: slowed the Snippit title animation so it’s easier to see on page load/reload."
+      ]
+    },
+    {
       "version": "0.0.0",
       "date": "2025-12-24",
       "notes": [
@@ -9,7 +21,7 @@
         "Patch notes now load from patch-notes.json so they can be updated without touching the code.",
         "Updated the \"What is Snippit?\" / Help screen with clearer sections (including an overview of the modes).",
         "Added a shared \"Points info\" popup that explains how points work.",
-        "Merged Points into Classic as a Play style (Classic + Points). The old Points card will now be the card for Reveal mode and now shows \"Coming soon…\".",
+        "Merged Points into Classic as a Play style (Classic + Points). The old Points card now shows \"Coming soon…\".",
         "Home bottom bar polish: patch notes icon support, responsive sizing on resize, and updated the credit-pill confetti effect.",
         "Performance improvements for smoother mobile play (reduced heavy UI updates and tuned map rendering)."
       ]

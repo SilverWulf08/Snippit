@@ -32,6 +32,10 @@ body {
     inset: 0;
     z-index: 900;
     overflow: hidden;
+    /* Match the small-screen home background on desktop too (prevents white fallback). */
+    background:
+        linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
+        var(--surface-2);
 }
 
 /* Mode intro overlay (after picking a mode, before Play) */
@@ -55,7 +59,7 @@ body {
     transform: translateY(0);
 }
 
-.mode-intro[data-mode="endless"] {
+.mode-intro[data-mode="classic"] {
     background:
         /* Smooth diagonal shadow that originates in the bottom-right corner */
         linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
@@ -575,11 +579,11 @@ body {
 }
 
 .home-title__inner.is-rolling .home-title__text {
-    animation: homeTitleTextFrontFlip 900ms linear both;
+    animation: homeTitleTextFrontFlip 1300ms linear both;
 }
 
 .home-title__inner.is-rolling .home-title__icon {
-    animation: homeTitleIconMultiSpin 900ms linear both;
+    animation: homeTitleIconMultiSpin 1300ms linear both;
 }
 
 @keyframes homeTitleTextFrontFlip {
@@ -636,9 +640,49 @@ body {
 .home-modes {
     position: absolute;
     inset: 0;
-    display: flex;
     z-index: 1;
     background: transparent;
+    display: block;
+    /* Must be interactive; otherwise the cards can't receive pointer events. */
+    pointer-events: auto;
+}
+
+/* Home screen: card deck (mode selector) */
+.home-deck {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: calc(140px + env(safe-area-inset-top));
+    bottom: calc(86px + env(safe-area-inset-bottom));
+
+    display: grid;
+    place-items: center;
+
+    perspective: 1100px;
+    perspective-origin: 50% 45%;
+    pointer-events: auto;
+    touch-action: none;
+
+    /* Sizing vars used by the cards */
+    --home-card-h: min(460px, calc(100% - 44px));
+    --home-card-w: min(360px, calc(100vw - 72px), calc(var(--home-card-h) * 5 / 7));
+    --home-deck-pad: 22px;
+}
+
+.home-deck::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(980px, 100%);
+    height: min(620px, 100%);
+    transform: translate(-50%, -50%);
+    border-radius: var(--radius);
+    background: rgba(30, 30, 30, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--shadow);
+    /* Never intercept clicks; cards must be clickable */
+    pointer-events: none;
 }
 .home-bottom-bar {
     position: absolute;
@@ -802,46 +846,114 @@ body {
 }
 
 .home-mode {
-    flex: 1;
+    /* Default accent (overridden per mode below) */
+    --home-accent: rgba(255, 255, 255, 0.85);
+    --deck-x: 0px;
+    --deck-y: 0px;
+    --deck-z: 0px;
+    --deck-ry: 0deg;
+    --deck-s: 1;
+    --deck-opacity: 1;
+    --hover-lift: 0px;
+    --hover-rx: 0deg;
+
+    position: absolute;
+    left: 50%;
+    top: 50%;
+
+    width: var(--home-card-w);
+    height: var(--home-card-h);
+
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    font-size: 34px;
-    font-weight: 500;
+    gap: 12px;
+
+    padding: clamp(16px, 2.2vw, 22px);
+    border-radius: 18px;
+
     user-select: none;
     cursor: pointer;
-    position: relative;
     overflow: hidden;
     isolation: isolate;
-    will-change: transform;
-    transform: translateZ(0);
+    transform-style: preserve-3d;
     backface-visibility: hidden;
-    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+    will-change: transform;
+
+    opacity: var(--deck-opacity);
+    transform:
+        translate(-50%, -50%)
+        translateX(var(--deck-x))
+        translateY(calc(var(--deck-y) + var(--hover-lift)))
+        rotateY(var(--deck-ry))
+        rotateX(var(--hover-rx))
+        translateZ(var(--deck-z))
+        scale(var(--deck-s));
+
+    transition:
+        transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        opacity 320ms ease,
+        filter 180ms ease,
+        box-shadow 240ms ease;
+
+    background: rgba(18, 18, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: var(--shadow-sm);
+    touch-action: pan-y;
 }
 
-/* Eliminate subpixel seams between flex cards on desktop */
-.home-mode + .home-mode {
-    margin-left: -1px;
+/* Card positions in the deck */
+.home-deck .home-mode[data-deck-pos="0"] {
+    --deck-x: 0px;
+    --deck-y: -4px;
+    --deck-z: 80px;
+    --deck-ry: 0deg;
+    --deck-s: 1;
+    --deck-opacity: 1;
+    z-index: 3;
+}
+
+.home-deck .home-mode[data-deck-pos="-1"] {
+    --deck-x: calc(-1 * min(240px, calc(var(--home-card-w) * 0.82)));
+    --deck-y: 12px;
+    --deck-z: 10px;
+    --deck-ry: 18deg;
+    --deck-s: 0.92;
+    --deck-opacity: 0.92;
+    z-index: 2;
+}
+
+.home-deck .home-mode[data-deck-pos="1"] {
+    --deck-x: min(240px, calc(var(--home-card-w) * 0.82));
+    --deck-y: 12px;
+    --deck-z: 10px;
+    --deck-ry: -18deg;
+    --deck-s: 0.92;
+    --deck-opacity: 0.92;
+    z-index: 2;
 }
 
 .home-mode__label {
     position: relative;
     z-index: 1;
+    font-size: clamp(22px, 3.2vw, 34px);
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    text-align: center;
 }
 
 .home-mode__description {
     position: relative;
     z-index: 1;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: clamp(13px, 1.6vw, 14px);
+    font-weight: 600;
     color: rgba(255, 255, 255, 0.85);
-    max-width: min(520px, calc(100% - 80px));
+    max-width: min(520px, calc(100% - 20px));
     text-align: center;
     line-height: 1.35;
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateY(6px);
     transition: opacity 220ms ease, transform 220ms ease;
     pointer-events: none;
 }
@@ -851,66 +963,76 @@ body {
     position: absolute;
     inset: 0;
     z-index: 0;
-    /* Neutral dark overlay to make panels darker without introducing new colors */
-    background: rgba(0, 0, 0, 0.68);
-    transition: background 180ms ease;
+    background:
+        radial-gradient(900px 540px at 20% 10%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.0) 55%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.18));
+    transition: filter 180ms ease;
+}
+
+.home-deck .home-mode::after {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--home-accent);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
+    opacity: 0.95;
+    z-index: 2;
 }
 
 .home-mode--blue {
-    /* Classic mode: gray */
-    background: var(--surface-2);
+    /* Classic mode */
+    --home-accent: rgba(255, 255, 255, 0.92);
 }
 
 .home-mode--red {
     /* Reveal mode: same green as the Guess button */
-    background: #4CAF50;
+    --home-accent: #4CAF50;
 }
 
 .home-mode--yellow {
     /* Questions mode: same yellow as the km distance indicator */
-    background: #f5c938;
+    --home-accent: #f5c938;
 }
 
-.home-mode--yellow:hover {
-    transform: scaleX(1.05);
-    transform-origin: left center;
-    z-index: 2;
-    filter: brightness(1.06);
-    box-shadow: 18px 0 32px rgba(0, 0, 0, 0.55);
+.home-deck .home-mode {
+    border-color: color-mix(in srgb, var(--home-accent) 55%, rgba(255, 255, 255, 0.14));
 }
 
-.home-mode--blue:hover {
-    /* Middle card: expand over both sides */
-    transform: scaleX(1.05);
-    transform-origin: center;
-    z-index: 2;
-    filter: brightness(1.06);
-    box-shadow: 0 0 32px rgba(0, 0, 0, 0.55);
+.home-deck .home-mode[data-deck-pos="0"] {
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.58);
 }
 
-.home-mode--red:hover {
-    transform: scaleX(1.05);
-    transform-origin: right center;
-    z-index: 2;
-    filter: brightness(1.06);
-    box-shadow: -18px 0 32px rgba(0, 0, 0, 0.55);
+.home-deck .home-mode:hover {
+    filter: brightness(1.05);
 }
 
-.home-mode:hover .home-mode__description,
-.home-mode:focus-visible .home-mode__description {
+.home-deck .home-mode[data-deck-pos="0"]:hover {
+    --hover-lift: -10px;
+    --hover-rx: 7deg;
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.62);
+}
+
+.home-deck .home-mode[data-deck-pos="-1"]:hover,
+.home-deck .home-mode[data-deck-pos="1"]:hover {
+    --hover-lift: -6px;
+    --hover-rx: 6deg;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.58);
+}
+
+.home-deck .home-mode[data-deck-pos="0"] .home-mode__description,
+.home-deck .home-mode:hover .home-mode__description,
+.home-deck .home-mode:focus-visible .home-mode__description {
     opacity: 1;
     transform: translateY(0);
 }
 
-.home-mode--yellow:hover::before,
-.home-mode--blue:hover::before,
-.home-mode--red:hover::before {
-    background: rgba(0, 0, 0, 0.58);
-}
-
 .home-mode:focus-visible {
     outline: 2px solid rgba(255, 255, 255, 0.25);
-    outline-offset: -6px;
+    outline-offset: 6px;
 }
 
 .game-screen {
@@ -930,76 +1052,37 @@ body {
         margin-right: 8px;
     }
 
-    /* Small screens: keep the page non-scrollable and put the 3 mode cards inside
-       a game-like rounded frame (title sits above the frame; credit/help sit below). */
+    /* Small screens: keep the page non-scrollable with the deck centered between title + bottom bar. */
     .home-screen {
         overflow: hidden;
-        background:
-            linear-gradient(to top left, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.30) 32%, rgba(0, 0, 0, 0.0) 72%),
-            var(--surface-2);
     }
 
-    .home-modes {
-        display: grid;
-        grid-template-rows: repeat(3, minmax(0, 1fr));
-        position: absolute;
-        left: 18px;
-        right: 18px;
-        top: calc(92px + env(safe-area-inset-top));
+    .home-deck {
+        top: calc(104px + env(safe-area-inset-top));
         bottom: calc(86px + env(safe-area-inset-bottom));
-        margin: auto;
-        width: min(640px, calc(100% - 36px));
-        /* Allow shrinking on short viewports so title/footer never overlap the cards */
-        height: min(740px, calc(100vh - 220px));
-
-        background: var(--surface);
-        border: 2px solid var(--border);
-        border-radius: var(--radius);
-        overflow: hidden;
-        box-shadow: var(--shadow);
+        --home-card-h: min(420px, calc(100% - 44px));
+        --home-card-w: min(320px, calc(100vw - 72px), calc(var(--home-card-h) * 5 / 7));
+        /* Safe spread so side cards never go off-screen on narrow widths */
+        --home-mobile-spread: max(0px, calc((100vw - 36px - var(--home-card-w)) / 2 - 18px));
     }
 
-    @supports (height: 100dvh) {
-        .home-modes {
-            height: min(740px, calc(100dvh - 220px));
-        }
-    }
-
-    .home-mode {
-        min-height: 0;
-        font-size: 24px;
-    }
-
-    /* Small-window card order: Classic -> Points -> Questions */
-    #endlessMode {
-        order: 1;
-    }
-
-    #pointsMode {
-        order: 2;
-    }
-
-    #questionsMode {
-        order: 3;
-    }
-
-    /* In the framed (stacked) layout, overlap borders vertically instead of horizontally */
-    .home-mode + .home-mode {
-        margin-left: 0;
-        margin-top: -1px;
+    .home-deck::before {
+        height: min(560px, 100%);
     }
 
     .home-bottom-bar {
         bottom: calc(18px + env(safe-area-inset-bottom));
     }
 
-    /* Mobile-friendly panel hover (mostly for small desktop windows) */
-    .home-mode--blue:hover,
-    .home-mode--red:hover,
-    .home-mode--yellow:hover {
-        transform: scaleY(1.03);
-        transform-origin: center;
-        box-shadow: 0 18px 32px rgba(0, 0, 0, 0.55);
+    /* Slightly tighter deck spread on smaller viewports */
+    .home-deck .home-mode[data-deck-pos="-1"] {
+        --deck-x: calc(-1 * min(200px, var(--home-mobile-spread)));
+        --deck-ry: 16deg;
+    }
+
+    .home-deck .home-mode[data-deck-pos="1"] {
+        --deck-x: min(200px, var(--home-mobile-spread));
+        --deck-ry: -16deg;
     }
 }
 
@@ -1012,6 +1095,46 @@ body {
         width: 34px;
         height: 34px;
         margin-right: 8px;
+    }
+}
+
+/* Narrow windows: switch to a vertical deck so side cards stay clickable and never drift off-screen. */
+@media (max-width: 520px) {
+    .home-deck {
+        top: calc(96px + env(safe-area-inset-top));
+        bottom: calc(86px + env(safe-area-inset-bottom));
+        --home-card-h: min(380px, calc(100% - 44px));
+        --home-card-w: min(300px, calc(100vw - 56px), calc(var(--home-card-h) * 5 / 7));
+        --home-vertical-spread: min(132px, calc(var(--home-card-h) * 0.28));
+    }
+
+    .home-deck .home-mode[data-deck-pos="-1"] {
+        --deck-x: 0px;
+        --deck-y: calc(-1 * var(--home-vertical-spread));
+        --deck-ry: 0deg;
+        --deck-s: 0.92;
+    }
+
+    .home-deck .home-mode[data-deck-pos="1"] {
+        --deck-x: 0px;
+        --deck-y: var(--home-vertical-spread);
+        --deck-ry: 0deg;
+        --deck-s: 0.92;
+    }
+}
+
+/* Narrow + short windows: tighten the vertical stack so it never collides with the title/footer. */
+@media (max-width: 520px) and (max-height: 640px) {
+    .home-deck {
+        --home-card-h: min(320px, calc(100% - 44px));
+        --home-card-w: min(280px, calc(100vw - 56px), calc(var(--home-card-h) * 5 / 7));
+        --home-vertical-spread: min(96px, calc(var(--home-card-h) * 0.22));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-deck .home-mode {
+        transition: none;
     }
 }
 

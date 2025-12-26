@@ -17,7 +17,7 @@ let gameInitialized = false;
 
 const GAME_MODE = (document.body && document.body.dataset && document.body.dataset.mode === 'points')
     ? 'points'
-    : ((document.body && document.body.dataset && document.body.dataset.mode === 'questions') ? 'questions' : 'endless');
+    : ((document.body && document.body.dataset && document.body.dataset.mode === 'questions') ? 'questions' : 'classic');
 const POINTS_ROUNDS_TOTAL = 10;
 const POINTS_GOAL_TOTAL = 1000;
 

@@ -228,7 +228,7 @@ function showModeIntro(mode) {
         moreParking.appendChild(moreBtn);
     }
 
-    if (mode === 'endless') {
+    if (mode === 'classic') {
         title.textContent = 'Classic mode';
         desc.textContent =
             'Play the classic Snippit experience.\n' +
@@ -379,7 +379,7 @@ function startSelectedMode() {
 
     showInitialSpinner();
 
-    if (pendingMode === 'endless') {
+    if (pendingMode === 'classic') {
         const scoring = getSelectedClassicScoring();
         if (scoring === 'points') {
             sessionStorage.setItem('snippit.startMode', 'points');
@@ -390,7 +390,7 @@ function startSelectedMode() {
             return;
         }
 
-        sessionStorage.setItem('snippit.startMode', 'endless');
+        sessionStorage.setItem('snippit.startMode', 'classic');
         setTimeout(() => {
             window.location.href = 'game.html';
         }, 80);
@@ -475,7 +475,7 @@ function wireModeIntro() {
                 setModeIntroMoreOverlayVisible(true);
             };
 
-            if (mode === 'endless' && getSelectedClassicScoring() === 'points') {
+            if (mode === 'classic' && getSelectedClassicScoring() === 'points') {
                 showPointsInfo();
                 return;
             }
@@ -533,7 +533,7 @@ function wireModeIntro() {
         const updateClassicPointsVisibility = () => {
             const modeIntro = document.getElementById('modeIntro');
             const mode = modeIntro ? modeIntro.dataset.mode : '';
-            if (mode !== 'endless') return;
+            if (mode !== 'classic') return;
 
             const v = getSelectedClassicScoring();
             pointsDiff.style.display = (v === 'points') ? 'block' : 'none';
@@ -559,11 +559,12 @@ function wireModeIntro() {
 }
 
 function wireHomeButtons() {
-    const endless = document.getElementById('endlessMode');
-    const points = document.getElementById('pointsMode');
+    const classic = document.getElementById('classicMode');
+    const points = document.getElementById('revealMode');
     const questions = document.getElementById('questionsMode');
     const help = document.getElementById('homeHelpBtn');
     const patchNotes = document.getElementById('homePatchNotesBtn');
+    const deck = document.getElementById('homeDeck');
 
     const activate = (el, handler) => {
         if (!el) return;
@@ -576,10 +577,192 @@ function wireHomeButtons() {
         });
     };
 
+    const wireHomeModeDeck = () => {
+        if (!deck || !classic || !questions || !points) {
+            // Fallback: keep the original click behavior.
+            activate(questions, () => showModeIntro('questions'));
+            activate(classic, () => showModeIntro('classic'));
+            activate(points, () => showModeIntro('points'));
+            return;
+        }
+
+        // Canonical order for the deck.
+        const cards = [questions, classic, points];
+        const modeById = {
+            questionsMode: 'questions',
+            classicMode: 'classic',
+            revealMode: 'points'
+        };
+
+        // Default: Classic mode is front-and-center.
+        let activeIndex = 1;
+        let isAnimating = false;
+
+        const normalizeDelta = (delta, n) => {
+            // Wrap into [-floor(n/2), floor(n/2)] for n=3 -> [-1, 1]
+            if (delta > 1) return delta - n;
+            if (delta < -1) return delta + n;
+            return delta;
+        };
+
+        const applyPositions = () => {
+            const n = cards.length;
+            for (let i = 0; i < n; i++) {
+                const card = cards[i];
+                const delta = normalizeDelta(i - activeIndex, n);
+                card.dataset.deckPos = String(delta);
+                card.tabIndex = (delta === 0) ? 0 : -1;
+            }
+        };
+
+        const setActive = (nextIndex, opts = {}) => {
+            const { focus = false } = opts;
+            if (typeof nextIndex !== 'number') return;
+            const n = cards.length;
+            const clamped = ((nextIndex % n) + n) % n;
+            if (clamped === activeIndex) return;
+            if (isAnimating) return;
+            isAnimating = true;
+            activeIndex = clamped;
+            applyPositions();
+
+            window.setTimeout(() => {
+                isAnimating = false;
+                if (focus) {
+                    const active = cards[activeIndex];
+                    if (active) active.focus({ preventScroll: true });
+                }
+            }, 540);
+        };
+
+        const cycle = (dir) => {
+            setActive(activeIndex + dir, { focus: true });
+        };
+
+        const openActiveMode = () => {
+            const active = cards[activeIndex];
+            if (!active) return;
+            const mode = modeById[active.id];
+            if (!mode) return;
+            showModeIntro(mode);
+        };
+
+        // Keyboard behavior for cards (click is handled via delegated handler below).
+        for (let i = 0; i < cards.length; i++) {
+            const card = cards[i];
+
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    cycle(-1);
+                    return;
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    cycle(1);
+                    return;
+                }
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (i !== activeIndex) {
+                        setActive(i, { focus: true });
+                    } else {
+                        openActiveMode();
+                    }
+                }
+            });
+        }
+
+        // Swipe support (mobile + trackpads). Keeps it lightweight: only detects a clear left/right gesture.
+        let pointerDown = false;
+        let startX = 0;
+        let startY = 0;
+        let startAt = 0;
+        let didSwipe = false;
+        const SWIPE_MIN_PX = 44;
+        const SWIPE_MAX_MS = 700;
+
+        const isVerticalDeckLayout = () => {
+            // Keep this in sync with the CSS breakpoint for the vertical deck.
+            return !!(window.matchMedia && window.matchMedia('(max-width: 520px)').matches);
+        };
+
+        const onPointerDown = (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            pointerDown = true;
+            didSwipe = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            startAt = performance.now();
+        };
+
+        const onPointerUp = (e) => {
+            if (!pointerDown) return;
+            pointerDown = false;
+            const dt = performance.now() - startAt;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            // Must be reasonably quick.
+            if (dt > SWIPE_MAX_MS) return;
+
+            if (isVerticalDeckLayout()) {
+                // Vertical deck: swipe up/down.
+                if (Math.abs(dy) < SWIPE_MIN_PX) return;
+                if (Math.abs(dy) < Math.abs(dx) * 1.25) return;
+
+                // Mark that we swiped so click handlers know not to fire.
+                didSwipe = true;
+
+                // Swipe up = next card (down the stack)
+                if (dy < 0) cycle(1);
+                else cycle(-1);
+                return;
+            }
+
+            // Horizontal deck: swipe left/right.
+            if (Math.abs(dx) < SWIPE_MIN_PX) return;
+            if (Math.abs(dx) < Math.abs(dy) * 1.25) return;
+
+            // Mark that we swiped so click handlers know not to fire.
+            didSwipe = true;
+
+            // Swipe left = next card (to the right)
+            if (dx < 0) cycle(1);
+            else cycle(-1);
+        };
+
+        deck.addEventListener('pointerdown', onPointerDown);
+        deck.addEventListener('pointerup', onPointerUp);
+        deck.addEventListener('pointercancel', () => { pointerDown = false; didSwipe = false; });
+
+        // Handle clicks on cards. We use a single delegated handler to avoid issues with pointer capture.
+        deck.addEventListener('click', (e) => {
+            // If a swipe just happened, ignore the click.
+            if (didSwipe) {
+                didSwipe = false;
+                return;
+            }
+
+            // Find which card was clicked.
+            const card = e.target.closest('.home-mode');
+            if (!card) return;
+
+            const cardIndex = cards.indexOf(card);
+            if (cardIndex === -1) return;
+
+            if (cardIndex !== activeIndex) {
+                setActive(cardIndex);
+            } else {
+                openActiveMode();
+            }
+        });
+
+        applyPositions();
+    };
+
     // No loading spinner here: we first show the mode intro screen.
-    activate(questions, () => showModeIntro('questions'));
-    activate(endless, () => showModeIntro('endless'));
-    activate(points, () => showModeIntro('points'));
+    wireHomeModeDeck();
     activate(help, () => showModeIntro('help'));
     activate(patchNotes, () => showModeIntro('patchNotes'));
 }
