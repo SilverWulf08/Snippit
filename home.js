@@ -18,7 +18,7 @@
 const INITIAL_LOAD_DELAY_MS = 900;
 let initialSpinnerDismissed = false;
 
-clearMapHintOnReload();
+clearDecksOnReload();
 
 // Questions intro should default to Classic/no-points.
 // We still store the choice when starting the mode, but we reset it when returning home.

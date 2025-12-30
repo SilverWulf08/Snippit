@@ -1343,23 +1343,19 @@ body {
     text-align: center;
 }
 
-/* Reveal mode: round indicator badge (top-right, below timer if present) */
-.reveal-round-indicator {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(8px);
-    padding: 6px 12px;
-    border-radius: 999px;
-    z-index: 1000;
-    font-size: 13px;
-    font-weight: 600;
+/* Reveal mode: show round inside the result popup instead of a floating badge */
+.reveal-stats-row {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reveal-round-progress {
+    font-size: 14px;
+    font-weight: 800;
     letter-spacing: 0.3px;
-    pointer-events: none;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.86);
 }
 
 #map {
@@ -1706,90 +1702,6 @@ body[data-mode="questions"].is-points-scoring .points-stats-row {
     display: flex;
 }
 
-/* Dismissible map hint (toast/snackbar) */
-.map-toast {
-    position: absolute;
-    left: 50%;
-    /* Desktop/tablet: sit above the bottom controls so it never covers Guess */
-    bottom: calc(92px + env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    z-index: 1300;
-    /* Keep it compact even when the map gets very wide */
-    width: max-content;
-    max-width: min(520px, calc(100% - 24px));
-
-    display: flex;
-    align-items: center;
-    gap: 10px;
-
-    background: rgba(36, 36, 36, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(10px);
-    box-shadow: var(--shadow-sm);
-    border-radius: 999px;
-    padding: 10px 12px;
-
-    color: rgba(255, 255, 255, 0.92);
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.15px;
-}
-
-.map-toast.map-toast--pop {
-    animation: mapToastPop 680ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-@keyframes mapToastPop {
-    0% {
-        opacity: 0;
-        transform: translateX(-50%) scale(0);
-    }
-    65% {
-        opacity: 1;
-        transform: translateX(-50%) scale(1.12);
-    }
-    100% {
-        opacity: 1;
-        transform: translateX(-50%) scale(1);
-    }
-}
-
-.map-toast__text {
-    line-height: 1.25;
-    max-width: 440px;
-    white-space: normal;
-}
-
-.map-toast__close {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    color: rgba(255, 255, 255, 0.92);
-    cursor: pointer;
-
-    font-size: 18px;
-    line-height: 1;
-    padding: 0;
-    box-shadow: none;
-    transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
-}
-
-.map-toast__close:hover {
-    transform: scale(1.08);
-    filter: brightness(1.06);
-    box-shadow: var(--shadow-sm);
-}
-
-.map-toast__close:active {
-    transform: scale(1.02);
-    box-shadow: none;
-}
-
 /* Next-round spinner */
 .spinner-overlay {
     position: fixed;
@@ -2026,13 +1938,6 @@ body[data-mode="questions"].is-points-scoring .points-stats-row {
 
     .result-show-toggle {
         top: calc(12px + env(safe-area-inset-top));
-    }
-
-    .map-toast {
-        bottom: calc(14px + env(safe-area-inset-bottom));
-        width: calc(100% - 24px);
-        justify-content: space-between;
-        text-align: left;
     }
 
     #container {

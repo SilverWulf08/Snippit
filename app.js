@@ -78,62 +78,6 @@ function getConfettiDevicePixelRatioCap() {
     return isLowEndMobileDevice() ? Math.min(raw, 1.25) : Math.min(raw, 2);
 }
 
-function getHintToastEls() {
-    return {
-        toast: document.getElementById('hintToast'),
-        close: document.getElementById('hintToastClose')
-    };
-}
-
-function isMapHintDismissed() {
-    return sessionStorage.getItem(MAP_HINT_DISMISSED_KEY) === '1';
-}
-
-function showMapHintToastIfAllowed() {
-    const { toast } = getHintToastEls();
-    if (!toast) return;
-    if (isMapHintDismissed()) {
-        toast.style.display = 'none';
-        return;
-    }
-
-    toast.style.display = 'flex';
-
-    // Pop animation only when the hint is shown for the first time in this tab session
-    // (and again after a hard refresh, since shared.js clears MAP_HINT_POP_SHOWN_KEY on reload).
-    if (sessionStorage.getItem(MAP_HINT_POP_SHOWN_KEY) !== '1') {
-        toast.classList.remove('map-toast--pop');
-        // Force reflow so the animation reliably restarts.
-        void toast.offsetWidth;
-        toast.classList.add('map-toast--pop');
-        sessionStorage.setItem(MAP_HINT_POP_SHOWN_KEY, '1');
-    }
-}
-
-function hideMapHintToast() {
-    const { toast } = getHintToastEls();
-    if (!toast) return;
-    toast.style.display = 'none';
-}
-
-function wireMapHintToast() {
-    const { toast, close } = getHintToastEls();
-    if (!toast || !close) return;
-
-    toast.addEventListener('animationend', (e) => {
-        if (e.animationName === 'mapToastPop') {
-            toast.classList.remove('map-toast--pop');
-        }
-    });
-
-    close.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        sessionStorage.setItem(MAP_HINT_DISMISSED_KEY, '1');
-        hideMapHintToast();
-    });
-}
-
 function getPointsDifficulty() {
     const key = (isQuestionsMode() && isQuestionsPointsMode()) ? QUESTIONS_DIFFICULTY_KEY : 'snippit.pointsDifficulty';
     const v = sessionStorage.getItem(key);
@@ -458,8 +402,7 @@ function initGameIfNeeded() {
     });
 
     initSplitter();
-    clearMapHintOnReload();
-    wireMapHintToast();
+    clearDecksOnReload();
 
     // Questions mode can optionally run with points scoring; drive UI visibility via a class.
     if (document.body) {
@@ -519,6 +462,7 @@ function ensurePointsState() {
         timeLimitMs: getPointsRoundTimeLimitMs(),
         gameEnded: false,
         gameOver: false,
+        gameOverReason: '',
         round: 0,
         totalPoints: 0,
         totalTimeMs: 0,
@@ -536,6 +480,7 @@ function resetPointsState() {
         timeLimitMs: getPointsRoundTimeLimitMs(),
         gameEnded: false,
         gameOver: false,
+        gameOverReason: '',
         round: 0,
         totalPoints: 0,
         totalTimeMs: 0,
@@ -683,7 +628,9 @@ function showPointsSummaryOverlay() {
     if (scoreEl) scoreEl.textContent = `${totalPoints} pts`;
     if (goalEl) {
         goalEl.textContent = gameOver
-            ? 'A guess was over 1000 km away'
+            ? ((pointsState && pointsState.gameOverReason === 'timeout')
+                ? "You didn't make a guess in time"
+                : 'A guess was over 1000 km away')
             : (success ? `Goal reached (≥ ${POINTS_GOAL_TOTAL})` : `Goal not reached (${POINTS_GOAL_TOTAL} needed)`);
     }
     if (difficultyEl) {
@@ -776,11 +723,12 @@ function wirePointsSummaryActions() {
 
 function endPointsGame(options = {}) {
     if (!pointsState) return;
-    const { gameOver = false } = options;
+    const { gameOver = false, reason = '' } = options;
     stopPointsRoundTimer();
     pointsState.roundEnded = true;
     pointsState.gameEnded = true;
     pointsState.gameOver = !!gameOver;
+    pointsState.gameOverReason = gameOver ? String(reason || '') : '';
 
     // Hide in-game controls so the summary is the focus.
     const guessBtn = document.getElementById('guessBtn');
@@ -801,18 +749,79 @@ function onPointsRoundTimeout() {
     setPointsTimerText('0:00');
     guessLocked = true;
 
-    // If this was the last round, finish immediately.
+    // Treat timeout like an end-of-round reveal (no guess was made).
+
+    // Clear any unsubmitted guess marker/line.
+    if (guessMarker) map.removeLayer(guessMarker);
+    if (polyline) map.removeLayer(polyline);
+    guessMarker = null;
+    polyline = null;
+    guessLocation = null;
+
+    // Show the actual location.
+    if (actualMarker) map.removeLayer(actualMarker);
+    actualMarker = L.circleMarker([actualLocation.lat, actualLocation.lng], {
+        radius: 10,
+        fillColor: '#FF5252',
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 1
+    }).addTo(map).bindPopup('Actual Location').openPopup();
+
+    // Center the map so the target is visible behind overlays.
+    map.setView([actualLocation.lat, actualLocation.lng], 5);
+
+    // Expert: any timeout is immediate Game Over.
+    if (pointsState.difficulty === 'expert') {
+        endPointsGame({ gameOver: true, reason: 'timeout' });
+        return;
+    }
+
+    // Last round: go straight to the summary overlay (but keep the target visible on the map behind it).
     if (pointsState.round >= POINTS_ROUNDS_TOTAL) {
         endPointsGame();
         return;
     }
 
-    // Auto-advance to the next round.
-    showRoundSpinner();
-    nextRoundTimer = setTimeout(() => {
-        nextRoundTimer = null;
-        newRound();
-    }, 500);
+    // Update result overlay text.
+    const distanceEl = document.getElementById('distance');
+    if (distanceEl) distanceEl.textContent = '—';
+
+    const roundEl = document.getElementById('roundProgress');
+    if (roundEl && pointsState) roundEl.textContent = `${pointsState.round}/${POINTS_ROUNDS_TOTAL}`;
+
+    const resultText = document.getElementById('resultText');
+    if (resultText) resultText.textContent = "⏰ You didn't make a guess in time.";
+
+    const actualName = document.getElementById('actualLocationName');
+    if (actualName) actualName.innerHTML = `<strong>Actual location:</strong> ${currentLocationName}`;
+
+    const guessedNameEl = document.getElementById('guessedLocationName');
+    if (guessedNameEl) guessedNameEl.innerHTML = '<strong>You guessed:</strong> (no guess)';
+
+    const factEl = document.getElementById('factText');
+    if (factEl) {
+        if (isQuestionsMode() && currentQuestionFact) {
+            factEl.textContent = currentQuestionFact;
+            factEl.style.display = 'block';
+        } else {
+            factEl.textContent = '';
+            factEl.style.display = 'none';
+        }
+    }
+
+    showResultAnimated();
+
+    // Show next button (no auto-advance).
+    const guessBtn = document.getElementById('guessBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (guessBtn) guessBtn.style.display = 'none';
+    if (nextBtn) {
+        nextBtn.textContent = 'Next Round';
+        nextBtn.disabled = false;
+        nextBtn.style.display = 'block';
+    }
 }
 
 function stopConfetti() {
@@ -1211,7 +1220,6 @@ function newRound() {
         factEl.textContent = '';
     }
     setQuestionFact('');
-    showMapHintToastIfAllowed();
 
     const mapEl = document.getElementById('map');
     if (mapEl) mapEl.classList.remove('result-hidden');
@@ -1338,8 +1346,6 @@ function makeGuess() {
     }
 
     guessLocked = true;
-
-    hideMapHintToast();
 
     const distance = calculateDistance(
         guessLocation.lat,

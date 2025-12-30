@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=20251226_1" />
+    <link rel="stylesheet" href="styles.css?v=20251230_3" />
 </head>
 <body data-mode="reveal">
     <script>
@@ -41,20 +41,17 @@
         <div id="panorama">
             <button id="homeButton" class="home-button" type="button" onclick="window.location.href='index.html'">Home</button>
             <div id="revealTimer" class="points-timer" aria-live="polite" style="display:none;">2:00</div>
-            <div id="revealRoundIndicator" class="reveal-round-indicator" aria-live="polite">Round 1 of 10</div>
             <div id="miniMap"></div>
         </div>
         <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>
         <div id="map">
-            <div id="hintToast" class="map-toast" role="status" aria-live="polite" style="display:none;">
-                <div class="map-toast__text">click on this map to place a guess!</div>
-                <button id="hintToastClose" class="map-toast__close" type="button" aria-label="Dismiss hint">×</button>
-            </div>
-
             <div id="result" class="map-overlay" style="display: none;">
                 <div class="result-content">
                     <h2>Result</h2>
                 <div class="distance" id="distance"></div>
+                <div class="reveal-stats-row">
+                    <div id="revealRoundProgress" class="reveal-round-progress">1/10</div>
+                </div>
                 <p id="resultText"></p>
                 <p class="location-info" id="actualLocationName"></p>
                 <p class="location-info" id="guessedLocationName"></p>
@@ -114,7 +111,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="locations.js"></script>
-    <script src="shared.js?v=20251222_2"></script>
-    <script src="reveal.js?v=20251226_1"></script>
+    <script src="shared.js?v=20251230_2"></script>
+    <script src="reveal.js?v=20251230_5"></script>
 </body>
 </html>

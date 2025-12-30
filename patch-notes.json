@@ -2,6 +2,19 @@
   "intro": "Patch notes for Snippit. Latest changes are at the top. (these patch notes and versions start at the release of the patch notes system)",
   "versions": [
     {
+      "version": "0.2.3",
+      "date": "2025-12-30",
+      "notes": [
+        "Removed the \"Click on this map to place a guess!\" popup and all related logic from all game modes.",
+        "Removed the floating round indicator (pill) from Points and Reveal modes; round progress is now shown inside the result popup instead.",
+        "Reveal mode: guess history is now preserved across rounds—your previous guesses remain visible on the map for the whole session.",
+        "Reveal mode: round progress is now shown in the result popup, including after timeouts.",
+        "Points and Reveal: round does not auto-advance on timer expiry; instead, a \"too late\" message is shown and you must click Next/Zoom Out to continue.",
+        "Points: on Expert difficulty, running out of time still ends the game immediately.",
+        "UI: various small layout and accessibility improvements."
+      ]
+    },
+    {
       "version": "0.2.2",
       "date": "2025-12-30",
       "notes": [

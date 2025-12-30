@@ -27,6 +27,9 @@ let guessLocked = false;
 let nextRoundTimer = null;
 let initialSpinnerDismissed = false;
 
+// Keep track of prior guesses in this 10-round session.
+let guessHistoryMarkers = [];
+
 const INITIAL_LOAD_DELAY_MS = 900;
 
 let gameInitialized = false;
@@ -215,59 +218,6 @@ function getConfettiDevicePixelRatioCap() {
     return isLowEndMobileDevice() ? Math.min(raw, 1.25) : Math.min(raw, 2);
 }
 
-function getHintToastEls() {
-    return {
-        toast: document.getElementById('hintToast'),
-        close: document.getElementById('hintToastClose')
-    };
-}
-
-function isMapHintDismissed() {
-    return sessionStorage.getItem(MAP_HINT_DISMISSED_KEY) === '1';
-}
-
-function showMapHintToastIfAllowed() {
-    const { toast } = getHintToastEls();
-    if (!toast) return;
-    if (isMapHintDismissed()) {
-        toast.style.display = 'none';
-        return;
-    }
-
-    toast.style.display = 'flex';
-
-    if (sessionStorage.getItem(MAP_HINT_POP_SHOWN_KEY) !== '1') {
-        toast.classList.remove('map-toast--pop');
-        void toast.offsetWidth;
-        toast.classList.add('map-toast--pop');
-        sessionStorage.setItem(MAP_HINT_POP_SHOWN_KEY, '1');
-    }
-}
-
-function hideMapHintToast() {
-    const { toast } = getHintToastEls();
-    if (!toast) return;
-    toast.style.display = 'none';
-}
-
-function wireMapHintToast() {
-    const { toast, close } = getHintToastEls();
-    if (!toast || !close) return;
-
-    toast.addEventListener('animationend', (e) => {
-        if (e.animationName === 'mapToastPop') {
-            toast.classList.remove('map-toast--pop');
-        }
-    });
-
-    close.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        sessionStorage.setItem(MAP_HINT_DISMISSED_KEY, '1');
-        hideMapHintToast();
-    });
-}
-
 function isTimerMode() {
     return sessionStorage.getItem('snippit.revealPlayStyle') === 'timer';
 }
@@ -352,19 +302,94 @@ function onRevealRoundTimeout() {
     revealState.totalTimeMs += timeLimit;
     setRevealTimerText('0:00');
 
-    // Time ran out for this round - auto advance to next reveal level
-    if (revealState.round >= REVEAL_MAX_ROUNDS) {
-        // Game over - ran out of rounds
-        endRevealGame({ gameOver: true });
+    guessLocked = true;
+
+    const isLastRound = revealState.round >= REVEAL_MAX_ROUNDS;
+
+    // Result UI: timeout behaves like an end-of-round pause.
+    const distanceEl = document.getElementById('distance');
+    if (distanceEl) distanceEl.textContent = '—';
+
+    const resultText = document.getElementById('resultText');
+    if (resultText) resultText.textContent = "⏰ You were too late — time ran out.";
+
+    const actualName = document.getElementById('actualLocationName');
+    const guessedNameEl = document.getElementById('guessedLocationName');
+
+    // Only reveal the target on the final round timeout.
+    if (isLastRound) {
+        if (actualMarker) map.removeLayer(actualMarker);
+        actualMarker = L.circleMarker([actualLocation.lat, actualLocation.lng], {
+            radius: 10,
+            fillColor: '#FF5252',
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 1
+        }).addTo(map).bindPopup('Actual Location').openPopup();
+
+        map.setView([actualLocation.lat, actualLocation.lng], 5);
+
+        if (actualName) actualName.innerHTML = `<strong>Actual location:</strong> ${currentLocationName}`;
+        if (guessedNameEl) guessedNameEl.innerHTML = '<strong>You guessed:</strong> (no guess)';
+    } else {
+        if (actualName) actualName.innerHTML = '';
+        if (guessedNameEl) guessedNameEl.innerHTML = '';
+    }
+
+        // Update the reveal round progress when the round ends
+        updateRevealRoundProgress();
+    showResultAnimated();
+
+    const guessBtn = document.getElementById('guessBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    if (guessBtn) guessBtn.style.display = 'none';
+
+    if (isLastRound) {
+        if (nextBtn) nextBtn.style.display = 'none';
+        setTimeout(() => {
+            endRevealGame({ gameOver: true, distance: 0 });
+        }, 500);
         return;
     }
 
-    // Auto-advance to next zoom level
-    showRoundSpinner();
-    nextRoundTimer = setTimeout(() => {
-        nextRoundTimer = null;
-        nextRevealRound();
-    }, 500);
+    if (nextBtn) {
+        nextBtn.style.display = 'block';
+        nextBtn.textContent = 'Zoom Out';
+        nextBtn.disabled = false;
+    }
+}
+
+function finalizeCurrentRoundGuessMarker(roundNumber) {
+    if (!guessMarker) return;
+    if (!guessLocation) return;
+
+    // Re-style the current round's marker and keep it on the map as history.
+    guessMarker.setStyle({
+        radius: 7,
+        fillColor: '#4CAF50',
+        color: '#fff',
+        weight: 2,
+        opacity: 0.65,
+        fillOpacity: 0.35
+    });
+
+    guessHistoryMarkers.push(guessMarker);
+    guessMarker = null;
+}
+
+function clearGuessHistoryMarkers() {
+    if (map && Array.isArray(guessHistoryMarkers)) {
+        for (const m of guessHistoryMarkers) {
+            try {
+                map.removeLayer(m);
+            } catch {
+                // Ignore
+            }
+        }
+    }
+    guessHistoryMarkers = [];
 }
 
 function initGameIfNeeded() {
@@ -404,8 +429,7 @@ function initGameIfNeeded() {
     });
 
     initSplitter();
-    clearMapHintOnReload();
-    wireMapHintToast();
+    clearDecksOnReload();
 
     // Show/hide timer based on play style
     const timerEl = document.getElementById('revealTimer');
@@ -643,11 +667,10 @@ function placeGuessMarker(latlng) {
     if (guessBtn) guessBtn.disabled = false;
 }
 
-function updateRoundIndicator() {
-    const el = document.getElementById('revealRoundIndicator');
-    if (el && revealState) {
-        el.textContent = `Round ${revealState.round} of ${REVEAL_MAX_ROUNDS}`;
-    }
+function updateRevealRoundProgress() {
+    const el = document.getElementById('revealRoundProgress');
+    if (!el || !revealState) return;
+    el.textContent = `${revealState.round}/${REVEAL_MAX_ROUNDS}`;
 }
 
 function startNewGame() {
@@ -660,6 +683,8 @@ function startNewGame() {
     if (guessMarker) map.removeLayer(guessMarker);
     if (actualMarker) map.removeLayer(actualMarker);
     if (polyline) map.removeLayer(polyline);
+
+    clearGuessHistoryMarkers();
 
     guessLocation = null;
     guessLocked = false;
@@ -677,7 +702,7 @@ function startNewGame() {
     const zoomLevel = REVEAL_ZOOM_LEVELS[0];
     createMiniMap(location.lat, location.lng, zoomLevel);
 
-    updateRoundIndicator();
+    updateRevealRoundProgress();
 
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -703,7 +728,6 @@ function startNewGame() {
     const showToggle = document.getElementById('resultShowToggle');
     if (showToggle) showToggle.classList.remove('is-visible');
 
-    showMapHintToastIfAllowed();
 
     // Reset main map view
     map.setView([20, 0], 2);
@@ -720,6 +744,12 @@ function startNewGame() {
 function nextRevealRound() {
     if (!revealState) return;
 
+    // Persist the just-finished round's guess marker so it remains visible in the next round.
+    const prevRound = revealState.round;
+    if (revealState.roundEnded) {
+        finalizeCurrentRoundGuessMarker(prevRound);
+    }
+
     revealState.round += 1;
     revealState.roundEnded = false;
 
@@ -728,7 +758,7 @@ function nextRevealRound() {
         return;
     }
 
-    // Clear guess marker and any leftover markers/lines
+    // Clear active guess marker (history markers remain).
     if (guessMarker) {
         map.removeLayer(guessMarker);
         guessMarker = null;
@@ -749,7 +779,7 @@ function nextRevealRound() {
     const zoomLevel = REVEAL_ZOOM_LEVELS[zoomIndex];
     updateMiniMapZoom(zoomLevel);
 
-    updateRoundIndicator();
+    updateRevealRoundProgress();
 
     const guessBtn = document.getElementById('guessBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -772,8 +802,6 @@ function nextRevealRound() {
 
     const showToggle = document.getElementById('resultShowToggle');
     if (showToggle) showToggle.classList.remove('is-visible');
-
-    showMapHintToastIfAllowed();
 
     // Reset main map view
     map.setView([20, 0], 2);
@@ -840,7 +868,7 @@ function showResultAnimated() {
 }
 
 function stopConfetti() {
-    confettiActive = false;
+    updateRevealRoundProgress();
     confettiContinuous = false;
     confettiPieces = [];
     if (confettiRafId !== null) {
@@ -1100,7 +1128,6 @@ function makeGuess() {
     }
 
     guessLocked = true;
-    hideMapHintToast();
 
     const distance = calculateDistance(
         guessLocation.lat,
@@ -1150,6 +1177,8 @@ function makeGuess() {
     // Display result
     const distanceEl = document.getElementById('distance');
     if (distanceEl) distanceEl.textContent = `${distance.toFixed(2)} km`;
+
+    updateRevealRoundProgress();
 
     let message = '';
     if (isCorrect) {
