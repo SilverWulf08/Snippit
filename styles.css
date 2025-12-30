@@ -49,14 +49,12 @@ body {
     padding: 18px;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(6px);
-    transition: opacity 260ms ease, transform 260ms ease;
+    transition: opacity 260ms ease;
 }
 
 .mode-intro.is-visible {
     opacity: 1;
     pointer-events: auto;
-    transform: translateY(0);
 }
 
 .mode-intro[data-mode="classic"] {
@@ -119,6 +117,12 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transform: translateY(10px) scale(0.99);
+    transition: transform 260ms ease;
+}
+
+.mode-intro.is-visible .mode-intro__panel {
+    transform: translateY(0) scale(1);
 }
 
 .mode-intro__back {
@@ -311,22 +315,72 @@ body {
     box-shadow: var(--shadow);
 }
 
-.mode-chip input {
-    accent-color: #4CAF50;
+/* Mode intro "checkbox" look (these are radios in HTML, but we style them as square checkboxes with a checkmark). */
+.mode-intro {
+    --intro-check-accent: var(--border);
 }
 
-/* Mode-specific accent colors for radio buttons */
-.mode-intro[data-mode="classic"] .mode-chip input {
-    accent-color: rgba(255, 255, 255, 0.92);
+.mode-intro[data-mode="classic"] {
+    --intro-check-accent: rgba(255, 255, 255, 0.92);
 }
 
-.mode-intro[data-mode="questions"] .mode-chip input {
-    accent-color: #f5c938;
+.mode-intro[data-mode="questions"] {
+    --intro-check-accent: #f5c938;
 }
 
-.mode-intro[data-mode="reveal"] .mode-chip input {
-    accent-color: #4CAF50;
+.mode-intro[data-mode="reveal"] {
+    --intro-check-accent: #4CAF50;
 }
+
+.mode-intro .mode-chip input[type="radio"],
+.mode-intro .mode-chip input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 2px solid var(--intro-check-accent);
+    background: rgba(0, 0, 0, 0);
+    display: inline-grid;
+    place-items: center;
+    margin: 0;
+    padding: 0;
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+    transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.mode-intro .mode-chip input[type="radio"]::after,
+.mode-intro .mode-chip input[type="checkbox"]::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--intro-check-accent);
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.mode-intro .mode-chip input[type="radio"]:checked,
+.mode-intro .mode-chip input[type="checkbox"]:checked {
+    border-color: var(--intro-check-accent);
+    box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.18);
+}
+
+.mode-intro .mode-chip input[type="radio"]:checked::after,
+.mode-intro .mode-chip input[type="checkbox"]:checked::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.mode-intro .mode-chip input[type="radio"]:focus-visible,
+.mode-intro .mode-chip input[type="checkbox"]:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline-offset: 3px;
+}
+
+/* Global help button: stays bottom-right and can sit above the intro overlay. */
+/* (Defined later with higher specificity so it can override .home-help-button.) */
 
 .mode-chip span {
     font-weight: 600;
@@ -845,6 +899,28 @@ body {
 .home-help-button:focus-visible {
     outline: 2px solid rgba(255, 255, 255, 0.25);
     outline-offset: 3px;
+}
+
+/* Global help button: stays bottom-right above mode intro overlays.
+   Use higher specificity than .home-help-button so it wins. */
+.home-help-button.home-help-button--global {
+    position: fixed;
+    right: calc(18px + env(safe-area-inset-right));
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    z-index: 980;
+
+    /* This button is no longer inside .home-bottom-bar, so ensure the size vars still resolve. */
+    --home-bottom-scale: 1;
+}
+
+.home-patch-button.home-patch-button--global {
+    position: fixed;
+    right: calc(18px + env(safe-area-inset-right) + (46px * var(--home-bottom-scale)) + 10px);
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    z-index: 980;
+
+    /* This button is no longer inside .home-bottom-bar, so ensure the size vars still resolve. */
+    --home-bottom-scale: 1;
 }
 
 .home-credit-pill:hover {

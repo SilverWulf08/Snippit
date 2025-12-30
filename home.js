@@ -55,6 +55,7 @@ function showHomeScreen() {
 }
 
 let pendingMode = null;
+let modeIntroReturnMode = null;
 
 const QUESTIONS_USE_POINTS_KEY = 'snippit.questionsUsePoints';
 const QUESTIONS_DIFFICULTY_KEY = 'snippit.questionsDifficulty';
@@ -231,6 +232,10 @@ function showModeIntro(mode) {
 
     intro.dataset.mode = mode;
 
+    // Keep the global (?) help button visible only on game-mode intros (and on the home screen).
+    updateGlobalHelpButtonVisibility(mode);
+    updateGlobalPatchNotesButtonVisibility(mode);
+
     if (back) back.style.display = '';
     if (play) {
         play.style.display = '';
@@ -334,9 +339,9 @@ function showModeIntro(mode) {
         const revealScoringHelp = document.getElementById('modeIntroRevealScoring');
         if (revealScoringHelp) revealScoringHelp.style.display = 'none';
 
-        // Spec: big Back button instead of Play for this screen.
-        if (back) back.style.display = 'none';
-        if (play) play.textContent = 'Back';
+        // Always keep the top Back button visible; hide the bottom Play button.
+        if (back) back.style.display = '';
+        if (play) play.style.display = 'none';
     } else if (mode === 'patchNotes') {
         title.textContent = 'Patch Notes';
         desc.textContent = '';
@@ -361,9 +366,9 @@ function showModeIntro(mode) {
         const revealScoringPN = document.getElementById('modeIntroRevealScoring');
         if (revealScoringPN) revealScoringPN.style.display = 'none';
 
-        // Use the same "big Back" behavior as the help screen.
-        if (back) back.style.display = 'none';
-        if (play) play.textContent = 'Back';
+        // Always keep the top Back button visible; hide the bottom Play button.
+        if (back) back.style.display = '';
+        if (play) play.style.display = 'none';
     } else {
         // Fallback
         title.textContent = '';
@@ -382,7 +387,40 @@ function showModeIntro(mode) {
 
 function hideModeIntro() {
     pendingMode = null;
+    modeIntroReturnMode = null;
     setModeIntroVisible(false);
+
+    // Back to home: show the global (?) help button again.
+    updateGlobalHelpButtonVisibility('');
+    updateGlobalPatchNotesButtonVisibility('');
+}
+
+function updateGlobalHelpButtonVisibility(currentMode) {
+    const help = document.getElementById('homeHelpBtn');
+    if (!help) return;
+
+    // Show on home and on game mode intros; hide on Help and Patch Notes.
+    const visibleModes = new Set(['', 'classic', 'questions', 'reveal']);
+    help.style.display = visibleModes.has(currentMode || '') ? '' : 'none';
+}
+
+function updateGlobalPatchNotesButtonVisibility(currentMode) {
+    const patchNotes = document.getElementById('homePatchNotesBtn');
+    if (!patchNotes) return;
+
+    // Only show Patch Notes button on the home screen.
+    patchNotes.style.display = (currentMode || '') === '' ? '' : 'none';
+}
+
+function handleModeIntroBack() {
+    // If Help was opened from another intro, go back to that intro.
+    if (pendingMode === 'help' && modeIntroReturnMode) {
+        const returnTo = modeIntroReturnMode;
+        modeIntroReturnMode = null;
+        showModeIntro(returnTo);
+        return;
+    }
+    hideModeIntro();
 }
 
 function getSelectedPointsDifficulty() {
@@ -513,7 +551,7 @@ function wireModeIntro() {
         });
     };
 
-    activate(back, hideModeIntro);
+    activate(back, handleModeIntroBack);
     activate(play, startSelectedMode);
 
     if (helpPointsInfoBtn) {
@@ -639,7 +677,7 @@ function wireHomeButtons() {
             // Fallback: keep the original click behavior.
             activate(questions, () => showModeIntro('questions'));
             activate(classic, () => showModeIntro('classic'));
-            activate(points, () => showModeIntro('points'));
+            activate(points, () => showModeIntro('reveal'));
             return;
         }
 
@@ -820,7 +858,13 @@ function wireHomeButtons() {
 
     // No loading spinner here: we first show the mode intro screen.
     wireHomeModeDeck();
-    activate(help, () => showModeIntro('help'));
+    activate(help, () => {
+        // If we are currently on a mode intro (classic/questions/reveal), opening help should return there.
+        if (pendingMode && pendingMode !== 'help' && pendingMode !== 'patchNotes') {
+            modeIntroReturnMode = pendingMode;
+        }
+        showModeIntro('help');
+    });
     activate(patchNotes, () => showModeIntro('patchNotes'));
 }
 

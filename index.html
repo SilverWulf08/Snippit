@@ -45,14 +45,16 @@
                 Made by Silverwulf
             </div>
             <div id="homeBottomActions" class="home-bottom-bar__actions" aria-label="Home buttons">
-                <button id="homePatchNotesBtn" class="home-patch-button" type="button" aria-label="Patch notes">
-                    <img class="home-patch-icon" src="patch notes.png" alt="" aria-hidden="true" />
-                </button>
-                <button id="homeHelpBtn" class="home-help-button" type="button" aria-label="What is Snippit?">?</button>
             </div>
         </div>
         <canvas id="homeConfettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
     </div>
+
+    <!-- Global Home buttons -->
+    <button id="homePatchNotesBtn" class="home-patch-button home-patch-button--global" type="button" aria-label="Patch notes">
+        <img class="home-patch-icon" src="patch notes.png" alt="" aria-hidden="true" />
+    </button>
+    <button id="homeHelpBtn" class="home-help-button home-help-button--global" type="button" aria-label="What is Snippit?">?</button>
 
     <!-- Mode intro screen (shown after choosing a mode; no loading spinner here) -->
     <div id="modeIntro" class="mode-intro" data-mode="" aria-hidden="true">

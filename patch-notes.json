@@ -2,6 +2,16 @@
   "intro": "Patch notes for Snippit. Latest changes are at the top. (these patch notes and versions start at the release of the patch notes system)",
   "versions": [
     {
+      "version": "0.2.2",
+      "date": "2025-12-30",
+      "notes": [
+        "Intro overlays: play style/difficulty selectors now use a cleaner round indicator style.",
+        "Help (?): the home screen help button now stays fixed in the bottom-right when opening a game mode intro (Classic / Questions / Reveal).",
+        "Patch Notes button is back next to the Help button on the home screen, and it only shows on the home screen.",
+        "UI: fixed the Help + Patch Notes buttons overlapping."
+      ]
+    },
+    {
       "version": "0.2.1",
       "date": "2025-12-26",
       "notes": [
