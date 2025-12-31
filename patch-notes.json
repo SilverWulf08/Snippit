@@ -2,6 +2,13 @@
   "intro": "Patch notes for Snippit. Latest changes are at the top. (these patch notes and versions start at the release of the patch notes system)",
   "versions": [
     {
+      "version": "0.3.1",
+      "date": "2025-12-31",
+      "notes": [
+        "Radar mode: Improved mobile support. The radar chart panel now scrolls if content overflows, so the title and legend are always accessible on all screen sizes."
+      ]
+    },
+    {
       "version": "0.3.0",
       "date": "2025-12-31",
       "notes": [

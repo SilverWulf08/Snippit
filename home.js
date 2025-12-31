@@ -320,6 +320,7 @@ function showModeIntro(mode) {
         desc.textContent =
             'Read the radar chart to guess the location based on its characteristics.\n\n' +
             'The radar shows: Climate, Elevation, Coastal Proximity, Latitude, Urban Density, Rainfall, and Remoteness.\n\n' +
+            'Scroll down on the chart to see the legend.\n\n' +
             'Choose Classic or Points play style.';
         if (moreBtn) moreBtn.style.display = 'none';
         if (classicScoring) classicScoring.style.display = 'none';
