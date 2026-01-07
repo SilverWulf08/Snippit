@@ -2,6 +2,17 @@
   "intro": "Patch notes for Snippit. Latest changes are at the top. (these patch notes and versions start at the release of the patch notes system)",
   "versions": [
     {
+      "version": "0.3.3",
+      "date": "2026-01-07",
+      "notes": [
+        "Points modes: Added flashy animated popups that appear when you make a guess, showing your earned points with a counting animation.",
+        "Points popups display the base points, speed multiplier badge (×1.5 or ×2), and calculation breakdown.",
+        "The popup features smooth scale and bounce animations, a shine effect sweeping across the points display, and glowing shadows.",
+        "Points animations work across all points-enabled modes: Classic Points, Questions Points, and Radar Points.",
+        "Popups are fully responsive with optimized sizing for mobile and tablet devices."
+      ]
+    },
+    {
       "version": "0.3.2",
       "date": "2026-01-07",
       "notes": [

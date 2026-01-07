@@ -43,3 +43,85 @@ function clearDecksOnReload() {
         sessionStorage.removeItem(RADAR_DECK_META_KEY);
     }
 }
+
+/**
+ * Show a flashy animated popup displaying points earned with multiplier
+ * @param {number} basePoints - Base points earned from distance
+ * @param {number} multiplier - Speed multiplier (1, 1.5, or 2)
+ * @param {number} totalPoints - Final points awarded (basePoints * multiplier)
+ */
+function showPointsPopup(basePoints, multiplier, totalPoints) {
+    // Create container for the popup
+    const popup = document.createElement('div');
+    popup.className = 'points-popup';
+    
+    // Create main points display with counting animation
+    const pointsDisplay = document.createElement('div');
+    pointsDisplay.className = 'points-popup__main';
+    
+    // Create the points number that will count up
+    const pointsNumber = document.createElement('span');
+    pointsNumber.className = 'points-popup__number';
+    pointsNumber.textContent = '0';
+    
+    const pointsLabel = document.createElement('span');
+    pointsLabel.className = 'points-popup__label';
+    pointsLabel.textContent = ' pts';
+    
+    pointsDisplay.appendChild(pointsNumber);
+    pointsDisplay.appendChild(pointsLabel);
+    popup.appendChild(pointsDisplay);
+    
+    // Show multiplier badge if > 1
+    if (multiplier > 1) {
+        const multiplierBadge = document.createElement('div');
+        multiplierBadge.className = 'points-popup__multiplier';
+        multiplierBadge.textContent = `×${multiplier} SPEED BONUS`;
+        popup.appendChild(multiplierBadge);
+        
+        // Show breakdown
+        const breakdown = document.createElement('div');
+        breakdown.className = 'points-popup__breakdown';
+        breakdown.textContent = `${basePoints} × ${multiplier}`;
+        popup.appendChild(breakdown);
+    }
+    
+    // Add to body
+    document.body.appendChild(popup);
+    
+    // Animate the number counting up
+    const duration = 800; // ms
+    const startTime = Date.now();
+    const startValue = 0;
+    const endValue = totalPoints;
+    
+    function updateNumber() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease out cubic for smooth deceleration
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.round(startValue + (endValue - startValue) * easeProgress);
+        
+        pointsNumber.textContent = currentValue.toString();
+        
+        if (progress < 1) {
+            requestAnimationFrame(updateNumber);
+        }
+    }
+    
+    requestAnimationFrame(updateNumber);
+    
+    // Trigger entrance animation
+    requestAnimationFrame(() => {
+        popup.classList.add('points-popup--show');
+    });
+    
+    // Remove popup after animation completes
+    setTimeout(() => {
+        popup.classList.add('points-popup--hide');
+        setTimeout(() => {
+            popup.remove();
+        }, 400);
+    }, 2200);
+}

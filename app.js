@@ -1595,6 +1595,11 @@ function makeGuess() {
         const awarded = Math.round(basePoints * multiplier);
         pointsState.totalPoints += awarded;
 
+        // Show flashy animated popup with points and multiplier
+        if (typeof showPointsPopup === 'function') {
+            showPointsPopup(basePoints, multiplier, awarded);
+        }
+
         const progressEl = document.getElementById('pointsProgress');
         if (progressEl) progressEl.textContent = `${pointsState.totalPoints}/${POINTS_GOAL_TOTAL} pts`;
 
