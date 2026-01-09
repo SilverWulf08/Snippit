@@ -2,6 +2,14 @@
   "intro": "Patch notes for Snippit. Latest changes are at the top. (these patch notes and versions start at the release of the patch notes system)",
   "versions": [
     {
+      "version": "0.3.5",
+      "date": "2026-01-09",
+      "notes": [
+        "Game modes: Timer now properly centered again at the top of the Snippit window.",
+        "Game modes: Changed 'Guess!' button text to 'Guess' for a cleaner interface and removed frosted glass effect around the button."
+      ]
+    },
+    {
       "version": "0.3.4",
       "date": "2026-01-08",
       "notes": [
